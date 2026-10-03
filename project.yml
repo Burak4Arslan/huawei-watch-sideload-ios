@@ -1,0 +1,36 @@
+# The Xcode project is generated with XcodeGen: ./generate.sh (uses the team and bundle ID from Config/local.env)
+name: HuaSideload
+options:
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${HUASIDELOAD_TEAM_ID}
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+targets:
+  HuaSideload:
+    type: application
+    platform: iOS
+    sources:
+      - path: HuaSideload
+        excludes: ["Info.plist"]
+      # Output of tools/build-watch-app.sh: the app lists these under "Watch apps"
+      - path: WatchApps
+        optional: true
+        buildPhase: resources
+        includes: ["*.bin"]
+    info:
+      path: HuaSideload/Info.plist
+      properties:
+        CFBundleDisplayName: HuaSideload
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        NSBluetoothAlwaysUsageDescription: Needed to connect to your Huawei watch over Bluetooth.
+        UIBackgroundModes: [bluetooth-central]
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ${HUASIDELOAD_BUNDLE_ID}
+        TARGETED_DEVICE_FAMILY: "1"

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Creates the two icons a watch app needs: icon.png (114x114) and icon_small.png (41x41).
 
-    tools/make-app-icon.py <watch-app-folder> [color, e.g. 33CC66]
+    tools/make-app-icon.py watch-apps/my-app            (green)
+    tools/make-app-icon.py watch-apps/my-app 2A6FDB     (any hex color)
 
 The watch installer requires BOTH in the icon folder; without icon_small the install fails with "103".
 To use your own icon, put files with the same names in resources/base/media/

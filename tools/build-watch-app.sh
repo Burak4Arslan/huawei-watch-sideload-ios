@@ -1,21 +1,22 @@
 #!/bin/bash
 # Compiles a watch app (HarmonyOS/OpenHarmony lite wearable, JS), packs it into a .bin and signs it.
 #
-#   tools/build-watch-app.sh <watch-app-folder> [debug|release]
+#   tools/build-watch-app.sh watch-apps/sample          (debug: plain JS)
+#   tools/build-watch-app.sh watch-apps/sample release  (release: bytecode)
 #
 # Command-line equivalent of DevEco Studio's "legacy lite" build:
 #   manifest -> ace-loader (webpack lite) -> restool -> haptobin_tool -> hap-sign-tool (bin)
 #
 # Environment variables (all optional):
-#   HUASIDELOAD_SIGNING_DIR    signing folder (default: <repo>/signing) with signing.env and profiles/
-#   HUASIDELOAD_OUT_DIR        output folder (default: <repo>/WatchApps); the iPhone app bundles the .bin files in it
+#   HUASIDELOAD_SIGNING_DIR    signing folder (default: signing/ in this repo) with signing.env and profiles/
+#   HUASIDELOAD_OUT_DIR        output folder (default: WatchApps/ in this repo); the iPhone app bundles the .bin files in it
 #   HUASIDELOAD_PHONE_PACKAGE  bundle ID of the iPhone app (default: HUASIDELOAD_BUNDLE_ID from Config/local.env)
 #   HUASIDELOAD_SKIP_SIGN=1    stop before signing (compile check)
 #   OHOS_SDK                   OpenHarmony SDK API 9 (default: ~/Library/Huawei/Sdk/openharmony/9)
 #   NODE16                     Node.js 16 (default: ~/nodejs/bin/node, else node on PATH)
 set -euo pipefail
 
-[ $# -ge 1 ] || { sed -n '2,16p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,17p' "$0"; exit 1; }
 APP="$(cd "$1" && pwd)"
 MODE="${2:-debug}"   # debug: plain JS, release: jerry-snapshot bytecode
 REPO="$(cd "$(dirname "$0")/.." && pwd)"

@@ -10,7 +10,7 @@ signing/
   password.txt             keystore password
   mykey-debug.cer          debug certificate downloaded from AppGallery Connect
   profiles/
-    com.yourname.huasideload.sample.p7b    one debug profile per watch app, named <package>.p7b
+    com.yourname.huasideload.sample.p7b    one debug profile per watch app, named after its package
 ```
 
 How to get them: main README > "Huawei developer account and signing".

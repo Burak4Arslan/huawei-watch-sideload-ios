@@ -41,9 +41,8 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 - Uploads **MP3/M4A/AAC/FLAC/WAV/OPUS** to the watch's own music player (to listen without the phone)
 - **JSON messaging** between your watch apps and the phone (Wear Engine P2P)
 - Shows the watch's **UDID** (needed for the debug profile; no Android phone required)
-- Hides identity details (UDID, serial number, MAC) on screen and in the log, e.g. while filming
 
-**Doesn't (tried; limited by the watch hardware or iOS):**
+**Doesn't (at least for now, tried; limited by the watch hardware or iOS):**
 - Play iPhone audio (Spotify etc.) through the watch speaker: the watch is not an audio receiver (A2DP)
 - Upload DRM-protected songs (Spotify, Apple Music) to the watch
 - Give watch apps internet access (but the phone app can send them any data)

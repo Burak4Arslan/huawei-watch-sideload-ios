@@ -1,0 +1,26 @@
+# --- Personal / secret: never committed ---
+Config/local.env
+signing/*
+!signing/README.md
+!signing/signing.env.example
+*.p12
+*.p7b
+*.cer
+*.csr
+*.jks
+password.txt
+# Signed watch apps contain your watch UDID and developer certificate
+WatchApps/*
+!WatchApps/README.md
+*.bin
+
+# --- Build output ---
+build/
+**/build/
+DerivedData/
+HuaSideload.xcodeproj/
+HuaSideload/Info.plist
+node_modules/
+*.xcuserstate
+xcuserdata/
+.DS_Store

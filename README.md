@@ -124,7 +124,7 @@ echo -n YOURPASSWORD > password.txt
 1. **Certificates, App ID and Profiles → Certificates → New:** type **Debug**, upload `mykey.csr`, download the `.cer` → `signing/mykey-debug.cer`.
 2. **Devices → Add:** type **Sports watch** (lite wearable), paste the UDID from HuaSideload.
 3. **My projects → create a project → Add app:** HarmonyOS app, device **Sports watch**, package name (e.g. `com.yourname.huasideload.sample`). Don't select any capabilities or permissions.
-4. **Profiles → Add:** that app, type **Debug**, your certificate, your watch → download the `.p7b` → save it as `signing/profiles/<package name>.p7b`.
+4. **Profiles → Add:** that app, type **Debug**, your certificate, your watch → download the `.p7b` → save it named after the app's package, e.g. `signing/profiles/com.yourname.huasideload.sample.p7b`.
 
 Repeat steps 3 and 4 for every new watch app. The key, certificate and device stay the same.
 
@@ -142,7 +142,7 @@ cp -R watch-apps/sample watch-apps/my-app
 ### 4.3 Build, bundle into the iPhone app, install on the watch
 
 ```bash
-tools/build-watch-app.sh watch-apps/my-app     # → WatchApps/<app_name>.bin
+tools/build-watch-app.sh watch-apps/my-app     # → WatchApps/My App.bin  (file name = app_name)
 ./generate.sh                                  # adds the new .bin to the Xcode project
 ```
 1. Run the iPhone app from Xcode again.
@@ -255,8 +255,13 @@ Fixes to the core then reach both projects automatically.
 - **"Verification failed: the saved key is no longer valid":** the watch was reset. **Forget pairing** → **Pair** again.
 - **Install fails with 103:** see the table in section 5. Start with `python3 tools/check-watch-bin.py WatchApps/X.bin`.
 - **"Could not reach the phone (is HuaSideload open?)":** the iPhone app must be running and connected to the watch. It also works in the background, but not after you force-quit it.
+- **Questions and bug reports:** [GitHub Issues](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues). Attach the log.
 - **Sharing the log:** **Copy** in the Log section. Identity details stay masked unless **Show identity** is on.
-- **Live log on a Mac:** `xcrun devicectl device process launch --device <iPhone UDID> --console <bundle ID>` (unlock the iPhone first). Every line starts with `[HuaSideload]`.
+- **Live log on a Mac** (unlock the iPhone first; every line starts with `[HuaSideload]`):
+  ```bash
+  xcrun devicectl list devices    # shows your iPhone's identifier, e.g. 00008110-001A2B3C4D5E6F70
+  xcrun devicectl device process launch --device 00008110-001A2B3C4D5E6F70 --console com.yourname.huasideload
+  ```
   `-e '{"HUASIDELOAD_DIAG":"1"}'` also asks the watch for its supported commands, capabilities and music storage.
 
 ---

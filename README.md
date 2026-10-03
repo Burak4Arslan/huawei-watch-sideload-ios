@@ -80,7 +80,7 @@ If the SDK or Node live elsewhere, set `OHOS_SDK=/path` or `NODE16=/path/to/node
 ## 3. Install the iPhone app and pair the watch
 
 ```bash
-git clone https://github.com/<user>/huawei-watch-sideload-ios.git HuaSideload && cd HuaSideload
+git clone https://github.com/Burak4Arslan/huawei-watch-sideload-ios.git HuaSideload && cd HuaSideload
 cp Config/local.env.example Config/local.env   # fill in your Team ID and bundle ID
 ./generate.sh                                  # creates HuaSideload.xcodeproj
 open HuaSideload.xcodeproj                     # pick your iPhone, Run

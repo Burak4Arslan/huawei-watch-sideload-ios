@@ -1,0 +1,4 @@
+<div class="container">
+    <image class="bird" src="/common/images/bird1.png"></image>
+    <text class="title">Flappy</text>
+</div>

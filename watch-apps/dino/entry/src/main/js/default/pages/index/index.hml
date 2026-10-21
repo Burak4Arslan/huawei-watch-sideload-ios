@@ -1,0 +1,4 @@
+<div class="container">
+    <image class="dino" src="/common/images/dino-stand.png"></image>
+    <text class="title">Dino</text>
+</div>

@@ -1,0 +1,108 @@
+/* Nokia 3310 screen colors; the arena is the screen itself (no walls) */
+.screen {
+    width: 466px;
+    height: 466px;
+    background-color: #C7F0D8;
+}
+
+.seg {
+    left: -100px;
+    top: -100px;
+    width: 20px;
+    height: 20px;
+    background-color: #43523D;
+}
+
+.food {
+    left: -100px;
+    top: -100px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    background-color: #43523D;
+}
+
+.eye {
+    left: -100px;
+    top: -100px;
+    width: 6px;
+    height: 6px;
+    background-color: #C7F0D8;
+}
+
+.score {
+    left: 133px;
+    top: 30px;
+    width: 200px;
+    height: 40px;
+    font-size: 30px;
+    color: #43523D;
+    text-align: center;
+}
+
+.title {
+    left: 83px;
+    top: 120px;
+    width: 300px;
+    height: 60px;
+    font-size: 38px;
+    color: #43523D;
+    text-align: center;
+}
+
+.hint {
+    left: 83px;
+    top: 300px;
+    width: 300px;
+    height: 40px;
+    font-size: 30px;
+    color: #43523D;
+    text-align: center;
+}
+
+.hint2 {
+    left: 83px;
+    top: 342px;
+    width: 300px;
+    height: 30px;
+    font-size: 22px;
+    color: #43523D;
+    text-align: center;
+}
+
+.panel {
+    left: 93px;
+    top: 112px;
+    width: 280px;
+    height: 170px;
+    border-radius: 20px;
+    background-color: #C7F0D8;
+    border-width: 4px;
+    border-color: #43523D;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.panel-title {
+    width: 260px;
+    height: 52px;
+    font-size: 38px;
+    color: #43523D;
+    text-align: center;
+}
+
+.panel-line {
+    width: 260px;
+    height: 40px;
+    font-size: 30px;
+    color: #43523D;
+    text-align: center;
+}
+
+.touch {
+    left: 0px;
+    top: 0px;
+    width: 466px;
+    height: 466px;
+}

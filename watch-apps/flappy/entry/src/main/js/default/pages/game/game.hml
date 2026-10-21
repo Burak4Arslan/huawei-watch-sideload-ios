@@ -1,0 +1,51 @@
+<stack class="screen">
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="cloud c3"></div>
+    <div class="cloud c4"></div>
+
+    <div class="column" style="left: {{p0x}};">
+        <div class="body" style="height: {{p0top}};"></div>
+        <div class="cap"></div>
+        <div class="gap"></div>
+        <div class="cap"></div>
+        <div class="body" style="height: {{p0bottom}};"></div>
+    </div>
+    <div class="column" style="left: {{p1x}};">
+        <div class="body" style="height: {{p1top}};"></div>
+        <div class="cap"></div>
+        <div class="gap"></div>
+        <div class="cap"></div>
+        <div class="body" style="height: {{p1bottom}};"></div>
+    </div>
+    <div class="column" style="left: {{p2x}};">
+        <div class="body" style="height: {{p2top}};"></div>
+        <div class="cap"></div>
+        <div class="gap"></div>
+        <div class="cap"></div>
+        <div class="body" style="height: {{p2bottom}};"></div>
+    </div>
+
+    <div class="grass"></div>
+    <div class="ground"></div>
+
+    <image class="bird" src="{{birdSrc}}" style="top: {{birdY}};"></image>
+
+    <image class="digit" src="{{d0}}" show="{{n0}}" style="left: {{x0}};"></image>
+    <image class="digit" src="{{d1}}" show="{{n1}}" style="left: {{x1}};"></image>
+    <image class="digit" src="{{d2}}" show="{{n2}}" style="left: {{x2}};"></image>
+
+    <text class="title" show="{{state == 'ready'}}">Flappy</text>
+    <text class="hint" show="{{state == 'ready'}}">Tap to fly</text>
+    <text class="best" show="{{state == 'ready'}}">{{bestText}}</text>
+
+    <div class="panel" show="{{state == 'over'}}">
+        <text class="panel-title">{{overTitle}}</text>
+        <text class="panel-line">{{scoreText}}</text>
+        <text class="panel-line">{{bestText}}</text>
+        <text class="panel-small" show="{{showFps}}">{{fpsText}}</text>
+    </div>
+    <text class="again" show="{{state == 'over'}}">Tap to play again</text>
+
+    <div class="touch" ontouchstart="press" onclick="tap"></div>
+</stack>

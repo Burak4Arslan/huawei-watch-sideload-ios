@@ -1,0 +1,23 @@
+<stack class="screen" style="background-color: {{bg}};">
+    <image class="moon" src="/common/images/moon.png" show="{{night}}"></image>
+    <image class="cloud" src="{{cloudSrc}}" style="left: {{c0x}}; top: {{c0y}};"></image>
+    <image class="cloud" src="{{cloudSrc}}" style="left: {{c1x}}; top: {{c1y}};"></image>
+
+    <image class="ground" src="{{groundSrc}}" style="left: {{groundX}};"></image>
+
+    <image class="obstacle" src="{{o0src}}" style="left: {{o0x}}; top: {{o0y}}; width: {{o0w}}; height: {{o0h}};"></image>
+    <image class="obstacle" src="{{o1src}}" style="left: {{o1x}}; top: {{o1y}}; width: {{o1w}}; height: {{o1h}};"></image>
+    <image class="obstacle" src="{{o2src}}" style="left: {{o2x}}; top: {{o2y}}; width: {{o2w}}; height: {{o2h}};"></image>
+
+    <image class="dino" src="{{dinoSrc}}" style="top: {{dinoY}};"></image>
+
+    <text class="score" style="color: {{ink}};">{{scoreText}}</text>
+
+    <text class="title" show="{{state == 'ready'}}" style="color: {{ink}};">Dino</text>
+    <text class="hint" show="{{state == 'ready'}}" style="color: {{ink}};">Tap to jump</text>
+    <text class="over" show="{{state == 'over'}}" style="color: {{ink}};">GAME OVER</text>
+    <text class="hint" show="{{state == 'over'}}" style="color: {{ink}};">Tap to play again</text>
+    <text class="fps" show="{{showFps && state == 'over'}}" style="color: {{ink}};">{{fpsText}}</text>
+
+    <div class="touch" ontouchstart="press" ontouchend="release" onclick="tap"></div>
+</stack>

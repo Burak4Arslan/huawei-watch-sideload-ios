@@ -22,6 +22,8 @@ protocol WatchFeature: AnyObject {
     func musicButton(_ button: MusicControl.Button?, volume: Int?)
     // Sections shown on the main screen below Status
     func sections() -> AnyView
+    // Filming mode (a clean main screen for screen recordings): the toolbar button only shows if a feature offers it
+    var offersFilmMode: Bool { get }
     // Bundled watch apps (by name, i.e. the .bin file name) hidden from the main screen in filming mode
     var filmModeHiddenApps: [String] { get }
 }
@@ -33,6 +35,7 @@ extension WatchFeature {
     func musicScreenOpened() {}
     func musicButton(_ button: MusicControl.Button?, volume: Int?) {}
     func sections() -> AnyView { AnyView(EmptyView()) }
+    var offersFilmMode: Bool { false }
     var filmModeHiddenApps: [String] { [] }
 }
 

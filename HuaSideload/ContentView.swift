@@ -10,8 +10,11 @@ struct ContentView: View {
     @State private var message = ""
     @State private var pickingMusic = false
     @State private var pickingWatchFace = false
-    // Filming mode: only what a video needs (no log, no personal panels, no identity buttons)
-    @AppStorage("filmModeV2") private var filmMode = false
+    // Filming mode: only what a video needs (no log controls, no feature sections, no identity buttons).
+    // Offered only when a feature asks for it (WatchFeature.offersFilmMode); the plain app never shows it.
+    @AppStorage("filmModeV2") private var filmModeOn = false
+    private var filmModeOffered: Bool { link.features.contains { $0.offersFilmMode } }
+    private var filmMode: Bool { filmModeOffered && filmModeOn }
 
     var body: some View {
         NavigationStack {
@@ -51,12 +54,14 @@ struct ContentView: View {
             .onAppear { if filmMode { link.revealIdentity = false } }
             .onChange(of: filmMode) { _, on in if on { link.revealIdentity = false } }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { filmMode.toggle() } label: {
-                        Label(L("Filming", "Çekim"), systemImage: filmMode ? "video.fill" : "video")
-                            .labelStyle(.titleAndIcon)
+                if filmModeOffered {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { filmModeOn.toggle() } label: {
+                            Label(L("Filming", "Çekim"), systemImage: filmMode ? "video.fill" : "video")
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .tint(filmMode ? .red : nil)
                     }
-                    .tint(filmMode ? .red : nil)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {

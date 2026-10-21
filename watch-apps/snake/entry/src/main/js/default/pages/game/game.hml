@@ -1,0 +1,59 @@
+<stack class="screen">
+    <div class="food" style="left: {{foodX}}; top: {{foodY}};"></div>
+    <div class="seg" style="left: {{s0x}}; top: {{s0y}};"></div>
+    <div class="seg" style="left: {{s1x}}; top: {{s1y}};"></div>
+    <div class="seg" style="left: {{s2x}}; top: {{s2y}};"></div>
+    <div class="seg" style="left: {{s3x}}; top: {{s3y}};"></div>
+    <div class="seg" style="left: {{s4x}}; top: {{s4y}};"></div>
+    <div class="seg" style="left: {{s5x}}; top: {{s5y}};"></div>
+    <div class="seg" style="left: {{s6x}}; top: {{s6y}};"></div>
+    <div class="seg" style="left: {{s7x}}; top: {{s7y}};"></div>
+    <div class="seg" style="left: {{s8x}}; top: {{s8y}};"></div>
+    <div class="seg" style="left: {{s9x}}; top: {{s9y}};"></div>
+    <div class="seg" style="left: {{s10x}}; top: {{s10y}};"></div>
+    <div class="seg" style="left: {{s11x}}; top: {{s11y}};"></div>
+    <div class="seg" style="left: {{s12x}}; top: {{s12y}};"></div>
+    <div class="seg" style="left: {{s13x}}; top: {{s13y}};"></div>
+    <div class="seg" style="left: {{s14x}}; top: {{s14y}};"></div>
+    <div class="seg" style="left: {{s15x}}; top: {{s15y}};"></div>
+    <div class="seg" style="left: {{s16x}}; top: {{s16y}};"></div>
+    <div class="seg" style="left: {{s17x}}; top: {{s17y}};"></div>
+    <div class="seg" style="left: {{s18x}}; top: {{s18y}};"></div>
+    <div class="seg" style="left: {{s19x}}; top: {{s19y}};"></div>
+    <div class="seg" style="left: {{s20x}}; top: {{s20y}};"></div>
+    <div class="seg" style="left: {{s21x}}; top: {{s21y}};"></div>
+    <div class="seg" style="left: {{s22x}}; top: {{s22y}};"></div>
+    <div class="seg" style="left: {{s23x}}; top: {{s23y}};"></div>
+    <div class="seg" style="left: {{s24x}}; top: {{s24y}};"></div>
+    <div class="seg" style="left: {{s25x}}; top: {{s25y}};"></div>
+    <div class="seg" style="left: {{s26x}}; top: {{s26y}};"></div>
+    <div class="seg" style="left: {{s27x}}; top: {{s27y}};"></div>
+    <div class="seg" style="left: {{s28x}}; top: {{s28y}};"></div>
+    <div class="seg" style="left: {{s29x}}; top: {{s29y}};"></div>
+    <div class="seg" style="left: {{s30x}}; top: {{s30y}};"></div>
+    <div class="seg" style="left: {{s31x}}; top: {{s31y}};"></div>
+    <div class="seg" style="left: {{s32x}}; top: {{s32y}};"></div>
+    <div class="seg" style="left: {{s33x}}; top: {{s33y}};"></div>
+    <div class="seg" style="left: {{s34x}}; top: {{s34y}};"></div>
+    <div class="seg" style="left: {{s35x}}; top: {{s35y}};"></div>
+    <div class="seg" style="left: {{s36x}}; top: {{s36y}};"></div>
+    <div class="seg" style="left: {{s37x}}; top: {{s37y}};"></div>
+    <div class="seg" style="left: {{s38x}}; top: {{s38y}};"></div>
+    <div class="seg" style="left: {{s39x}}; top: {{s39y}};"></div>
+    <div class="eye" style="left: {{eyeX}}; top: {{eyeY}};"></div>
+
+    <text class="score">{{scoreText}}</text>
+
+    <text class="title" show="{{state == 'ready'}}">Snake</text>
+    <text class="hint" show="{{state == 'ready'}}">Tap to start</text>
+    <text class="hint2" show="{{state == 'ready'}}">Turns toward your tap</text>
+
+    <div class="panel" show="{{state == 'over'}}">
+        <text class="panel-title">Game over</text>
+        <text class="panel-line">{{resultText}}</text>
+        <text class="panel-line">{{bestText}}</text>
+    </div>
+    <text class="hint" show="{{state == 'over'}}">Tap to play again</text>
+
+    <div class="touch" ontouchstart="press" onclick="tap"></div>
+</stack>

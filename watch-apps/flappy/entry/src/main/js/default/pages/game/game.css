@@ -1,0 +1,177 @@
+.screen {
+    width: 466px;
+    height: 466px;
+    background-color: #4EC0CA;
+}
+
+.cloud {
+    top: 362px;
+    width: 130px;
+    height: 70px;
+    border-radius: 35px;
+    background-color: #D7F1F3;
+}
+
+.c1 {
+    left: -20px;
+}
+
+.c2 {
+    left: 95px;
+    top: 348px;
+}
+
+.c3 {
+    left: 215px;
+}
+
+.c4 {
+    left: 330px;
+    top: 350px;
+}
+
+/* One pipe column: top body + cap + gap + cap + bottom body = 404 px down to the ground */
+.column {
+    left: 560px;
+    top: 0px;
+    width: 92px;
+    height: 404px;
+    flex-direction: column;
+    align-items: center;
+}
+
+.body {
+    width: 80px;
+    height: 100px;
+    background-color: #73BF2E;
+    border-width: 4px;
+    border-color: #2F5E10;
+}
+
+.cap {
+    width: 92px;
+    height: 28px;
+    background-color: #73BF2E;
+    border-width: 4px;
+    border-color: #2F5E10;
+}
+
+.gap {
+    width: 92px;
+    height: 180px;
+}
+
+.grass {
+    left: 0px;
+    top: 404px;
+    width: 466px;
+    height: 12px;
+    background-color: #73BF2E;
+}
+
+.ground {
+    left: 0px;
+    top: 416px;
+    width: 466px;
+    height: 50px;
+    background-color: #DED895;
+}
+
+.bird {
+    left: 130px;
+    top: 200px;
+    width: 60px;
+    height: 46px;
+}
+
+.digit {
+    left: 0px;
+    top: 36px;
+    width: 33px;
+    height: 51px;
+}
+
+.title {
+    left: 83px;
+    top: 104px;
+    width: 300px;
+    height: 60px;
+    font-size: 38px;
+    color: #FFFFFF;
+    text-align: center;
+}
+
+.hint {
+    left: 83px;
+    top: 282px;
+    width: 300px;
+    height: 40px;
+    font-size: 30px;
+    color: #FFFFFF;
+    text-align: center;
+}
+
+.best {
+    left: 83px;
+    top: 322px;
+    width: 300px;
+    height: 40px;
+    font-size: 30px;
+    color: #543847;
+    text-align: center;
+}
+
+.panel {
+    left: 83px;
+    top: 108px;
+    width: 300px;
+    height: 200px;
+    border-radius: 24px;
+    background-color: #DED895;
+    border-width: 4px;
+    border-color: #543847;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.panel-title {
+    width: 280px;
+    height: 52px;
+    font-size: 38px;
+    color: #E86101;
+    text-align: center;
+}
+
+.panel-line {
+    width: 280px;
+    height: 40px;
+    font-size: 30px;
+    color: #543847;
+    text-align: center;
+}
+
+.panel-small {
+    width: 280px;
+    height: 30px;
+    font-size: 22px;
+    color: #8A7A5A;
+    text-align: center;
+}
+
+.again {
+    left: 83px;
+    top: 322px;
+    width: 300px;
+    height: 40px;
+    font-size: 30px;
+    color: #FFFFFF;
+    text-align: center;
+}
+
+.touch {
+    left: 0px;
+    top: 0px;
+    width: 466px;
+    height: 466px;
+}

@@ -1,0 +1,98 @@
+.screen {
+    width: 466px;
+    height: 466px;
+    background-color: #F7F7F7;
+}
+
+.moon {
+    left: 330px;
+    top: 96px;
+    width: 24px;
+    height: 42px;
+}
+
+.cloud {
+    left: 500px;
+    top: 120px;
+    width: 46px;
+    height: 14px;
+}
+
+/* Ground line at y=300; the strip repeats every 100 px, so it scrolls left and wraps around */
+.ground {
+    left: 0px;
+    top: 298px;
+    width: 566px;
+    height: 12px;
+}
+
+.obstacle {
+    left: 600px;
+    top: 253px;
+    width: 27px;
+    height: 51px;
+}
+
+.dino {
+    left: 60px;
+    top: 242px;
+    width: 60px;
+    height: 60px;
+}
+
+.score {
+    left: 83px;
+    top: 66px;
+    width: 300px;
+    height: 40px;
+    font-size: 30px;
+    color: #535353;
+    text-align: center;
+}
+
+.title {
+    left: 83px;
+    top: 140px;
+    width: 300px;
+    height: 60px;
+    font-size: 38px;
+    color: #535353;
+    text-align: center;
+}
+
+.over {
+    left: 83px;
+    top: 140px;
+    width: 300px;
+    height: 60px;
+    font-size: 38px;
+    color: #535353;
+    text-align: center;
+}
+
+.hint {
+    left: 83px;
+    top: 340px;
+    width: 300px;
+    height: 40px;
+    font-size: 30px;
+    color: #535353;
+    text-align: center;
+}
+
+.fps {
+    left: 133px;
+    top: 386px;
+    width: 200px;
+    height: 30px;
+    font-size: 22px;
+    color: #535353;
+    text-align: center;
+}
+
+.touch {
+    left: 0px;
+    top: 0px;
+    width: 466px;
+    height: 466px;
+}

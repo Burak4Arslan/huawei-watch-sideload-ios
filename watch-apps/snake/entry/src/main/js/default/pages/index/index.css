@@ -1,0 +1,16 @@
+.container {
+    width: 466px;
+    height: 466px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #C7F0D8;
+}
+
+.title {
+    width: 300px;
+    height: 60px;
+    font-size: 38px;
+    color: #43523D;
+    text-align: center;
+}

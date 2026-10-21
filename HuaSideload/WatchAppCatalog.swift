@@ -4,7 +4,8 @@ import Security
 // Signed watch apps bundled inside the iPhone app (WatchApps/*.bin).
 // tools/build-watch-app.sh writes every app there as "<app name>.bin"; no code per app is needed.
 struct BundledWatchApp: Identifiable {
-    var id: String { package }
+    // file name, not package: two builds of the same package (e.g. a test variant) can sit side by side
+    var id: String { name }
     let name: String
     let package: String
     let version: String

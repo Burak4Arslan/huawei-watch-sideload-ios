@@ -20,6 +20,11 @@ targets:
         optional: true
         buildPhase: resources
         includes: ["*.bin"]
+      # Watch face packages (.hwt): the app lists these under "Watch faces"
+      - path: WatchFaces
+        optional: true
+        buildPhase: resources
+        includes: ["*.hwt"]
     info:
       path: HuaSideload/Info.plist
       properties:

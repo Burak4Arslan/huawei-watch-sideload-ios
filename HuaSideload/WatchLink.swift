@@ -40,6 +40,7 @@ final class WatchLink: NSObject, ObservableObject {
     private var secrets: [String] = []
     @Published private(set) var musicStorage: MusicControl.Storage?
     @Published private(set) var musicUploadStatus: String?
+    @Published private(set) var watchFaceStatus: String?
     // The watch asks for song info by file name: file name -> (title, artist)
     private var musicMetadata: [String: (title: String, artist: String)] = [:]
     private var lastInstallStatus: Int?
@@ -222,6 +223,8 @@ final class WatchLink: NSObject, ObservableObject {
 
     func disconnect() {
         wantsConnection = false
+        // Disconnecting by hand means "start clean": don't reconnect on the next launch until a watch is picked again
+        UserDefaults.standard.removeObject(forKey: Self.lastWatchKey)
         guard let peripheral else { return }
         central.cancelPeripheralConnection(peripheral)
         if isConnecting {
@@ -463,11 +466,21 @@ final class WatchLink: NSObject, ObservableObject {
         }
     }
 
+    // Short result line for the screen (filming mode shows it instead of the log): ok nil = in progress
+    struct AppInstallStatus { let text: String; let ok: Bool? }
+    @Published private(set) var appInstallStatus: AppInstallStatus?
+
     // Installs a signed watch app bundled in the iPhone app (WatchApps/*.bin) on the watch
     func installWatchApp(_ app: BundledWatchApp) {
         watchAppProgress = 0
+        appInstallStatus = AppInstallStatus(text: L("Sending \(app.name) to the watch…", "\(app.name) saate gönderiliyor…"), ok: nil)
         run(L("Installing \(app.name) on the watch…", "\(app.name) saate yükleniyor…")) { session in
-            defer { self.watchAppProgress = nil }
+            defer {
+                self.watchAppProgress = nil
+                if self.appInstallStatus?.ok == nil {
+                    self.appInstallStatus = AppInstallStatus(text: L("\(app.name) could not be installed", "\(app.name) kurulamadı"), ok: false)
+                }
+            }
             self.append(.info, "\(app.name): \(app.package) \(app.version), \(app.data.count) \(L("bytes", "bayt"))")
             if let platform = try? await session.appPlatform() {
                 self.append(.info, L("Watch app platform: ", "Saatin uygulama platformu: ") + WatchApps.describeParams(platform))
@@ -477,6 +490,7 @@ final class WatchLink: NSObject, ObservableObject {
                 self.watchAppProgress = fraction
             }
             self.append(.success, L("Transfer finished, waiting for the watch to install…", "Dosya aktarımı bitti, saatin kurulumu bekleniyor…"))
+            self.appInstallStatus = AppInstallStatus(text: L("The watch is installing \(app.name)…", "Saat \(app.name) uygulamasını kuruyor…"), ok: nil)
             // Wait up to 90 s for the watch to report 102 (installed) or 103 (failed)
             for _ in 0..<90 where self.lastInstallStatus != 102 && self.lastInstallStatus != 103 {
                 try? await Task.sleep(for: .seconds(1))
@@ -487,6 +501,45 @@ final class WatchLink: NSObject, ObservableObject {
                 self.append(mine ? .success : .error, mine ? L("\(app.name) is installed on the watch 🎉", "\(app.name) saatte kurulu 🎉")
                             : L("\(app.name) is not on the watch. For error 103 see README > Troubleshooting",
                                 "\(app.name) saatin listesinde yok. 103 hatası için README > Troubleshooting"))
+                // 103 wins: an older build of the same package may still be on the watch
+                if self.lastInstallStatus == 103 {
+                    self.appInstallStatus = AppInstallStatus(text: L("The watch rejected \(app.name): 103", "Saat \(app.name) uygulamasını reddetti: 103"), ok: false)
+                } else {
+                    self.appInstallStatus = mine ? AppInstallStatus(text: L("\(app.name) installed ✓", "\(app.name) kuruldu ✓"), ok: true)
+                        : AppInstallStatus(text: L("\(app.name) could not be installed", "\(app.name) kurulamadı"), ok: false)
+                }
+            }
+        }
+    }
+
+    // Uploads a watch face package (.hwt from Huawei Theme Studio). The watch adds it to its watch face list;
+    // pick it on the watch by touching and holding the current watch face.
+    func installWatchFace(_ url: URL, title displayTitle: String? = nil) {
+        guard busy == nil else { return }
+        watchAppProgress = 0
+        watchFaceStatus = L("Preparing the watch face…", "Kadran hazırlanıyor…")
+        run(L("Installing the watch face…", "Kadran saate yükleniyor…")) { session in
+            defer { self.watchAppProgress = nil }
+            do {
+                let accessing = url.startAccessingSecurityScopedResource()
+                defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+                let face = try WatchFacePackage(hwt: Data(contentsOf: url))
+                let title = displayTitle ?? face.title
+                self.append(.info, L("Watch face: \(title), screen \(face.screen), version \(face.version), \(face.bin.count / 1024) KB",
+                                     "Kadran: \(title), ekran \(face.screen), sürüm \(face.version), \(face.bin.count / 1024) KB"))
+                self.watchFaceStatus = L("Sending \(title) (\(face.bin.count / 1024) KB)…", "\(title) gönderiliyor (\(face.bin.count / 1024) KB)…")
+                // Like Gadgetbridge: a random numeric name with a version suffix
+                let name = String(format: "%09d_1.0.0", Int.random(in: 0..<1_000_000_000))
+                try await session.uploadFile(face.bin, name: name, type: FileUpload.FileType.watchface) { fraction in
+                    self.watchAppProgress = fraction
+                }
+                let done = L("Watch face sent. On the watch, touch and hold the watch face and pick \(title).",
+                             "Kadran gönderildi. Saatte kadrana basılı tut ve listeden \(title) kadranını seç.")
+                self.watchFaceStatus = done
+                self.append(.success, done)
+            } catch {
+                self.watchFaceStatus = L("Error: ", "Hata: ") + "\(error)"
+                throw error
             }
         }
     }
@@ -604,6 +657,8 @@ final class WatchLink: NSObject, ObservableObject {
         let range = NSRange(result.startIndex..., in: result)
         return Self.macPattern.stringByReplacingMatches(in: result, range: range, withTemplate: "••:••:••:••:••:••")
     }
+
+    func clearLog() { log.removeAll() }
 
     private func append(_ kind: LogKind, _ text: String) {
         print("[HuaSideload] \(text)")

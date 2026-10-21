@@ -9,15 +9,14 @@ struct ContentView: View {
     @State private var copied = false
     @State private var message = ""
     @State private var pickingMusic = false
+    @State private var pickingWatchFace = false
+    // Filming mode: only what a video needs (no log, no personal panels, no identity buttons)
+    @AppStorage("filmModeV2") private var filmMode = false
 
     var body: some View {
         NavigationStack {
             List {
                 statusSection
-
-                ForEach(link.features.indices, id: \.self) { index in
-                    link.features[index].sections()
-                }
 
                 if link.connectedName == nil && !link.isConnecting {
                     devicesSection
@@ -25,10 +24,17 @@ struct ContentView: View {
                     watchSection
                     if link.isPaired {
                         watchAppsSection
-                        musicSection
+                        watchFaceSection
+                        if !filmMode { musicSection }
                         notificationSection
+                        // Feature sections (navigation, remote control etc.): only when paired, at the bottom, never in filming mode
+                        if !filmMode {
+                            ForEach(link.features.indices, id: \.self) { index in
+                                link.features[index].sections()
+                            }
+                        }
                     }
-                    if link.hasSavedPairing {
+                    if link.hasSavedPairing && !filmMode {
                         Section {
                             Button(L("Forget pairing", "Eşleşmeyi unut"), role: .destructive) { link.forgetPairing() }
                         } footer: {
@@ -41,7 +47,17 @@ struct ContentView: View {
                 logSection
             }
             .navigationTitle(AppInfo.displayName)
+            // While filming, identities (UDID, serial number, MAC) always stay masked, in the log too
+            .onAppear { if filmMode { link.revealIdentity = false } }
+            .onChange(of: filmMode) { _, on in if on { link.revealIdentity = false } }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { filmMode.toggle() } label: {
+                        Label(L("Filming", "Çekim"), systemImage: filmMode ? "video.fill" : "video")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .tint(filmMode ? .red : nil)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Picker(L("Language", "Dil"), selection: $language) {
@@ -60,36 +76,47 @@ struct ContentView: View {
 
     private var statusSection: some View {
         Section {
-            LabeledContent(L("Bluetooth", "Bluetooth"), value: link.bluetoothState)
+            if !filmMode {
+                LabeledContent(L("Bluetooth", "Bluetooth"), value: link.bluetoothState)
+            }
             LabeledContent(L("Watch", "Saat"), value: link.connectedName ?? (link.isConnecting ? L("Connecting…", "Bağlanıyor…") : L("Not connected", "Bağlı değil")))
             LabeledContent(L("Pairing", "Eşleşme"), value: link.isPaired ? L("Encrypted connection", "Şifreli bağlantı kuruldu")
                            : (link.huaweiChannelReady ? L("Channel ready, not paired", "Kanal hazır, eşleşilmedi") : L("None", "Yok")))
             if let battery = link.battery {
                 LabeledContent(L("Battery", "Pil"), value: "\(battery)%")
             }
-            ForEach(link.watchInfo, id: \.self) { Text(link.display($0)).font(.callout) }
-            if let udid = link.watchUDID {
+            if !filmMode {
+                ForEach(link.watchInfo, id: \.self) { Text(link.display($0)).font(.callout) }
+            }
+            // In filming mode only once paired (an identity left over from the last session must not show before pairing)
+            if let udid = link.watchUDID, link.isPaired || !filmMode {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("UDID (for the debug profile)", "UDID (geliştirici profili için)")).font(.caption).foregroundStyle(.secondary)
                     Text(link.revealIdentity ? udid : String(repeating: "•", count: 16))
                         .font(.caption.monospaced())
                         .textSelection(.enabled)
                 }
-                Button(L("Copy UDID", "UDID'yi kopyala")) { UIPasteboard.general.string = udid }
+                if !filmMode {
+                    Button(L("Copy UDID", "UDID'yi kopyala")) { UIPasteboard.general.string = udid }
+                }
             }
         } header: {
             HStack {
                 Text(L("Status", "Durum"))
                 Spacer()
-                Button(link.revealIdentity ? L("Hide identity", "Kimliği gizle") : L("Show identity", "Kimliği göster")) {
-                    link.revealIdentity.toggle()
+                if !filmMode {
+                    Button(link.revealIdentity ? L("Hide identity", "Kimliği gizle") : L("Show identity", "Kimliği göster")) {
+                        link.revealIdentity.toggle()
+                    }
+                    .font(.caption)
                 }
-                .font(.caption)
             }
             .textCase(nil)
         } footer: {
-            Text(L("UDID, serial number and MAC addresses are hidden on screen and in the log (e.g. while filming). \"Show identity\" reveals them.",
-                   "UDID, seri no ve MAC adresleri ekranda ve kayıtlarda gizli tutulur (video çekerken görünmesin diye). \"Kimliği göster\" ile açılır."))
+            if !filmMode {
+                Text(L("UDID, serial number and MAC addresses are hidden on screen and in the log (e.g. while filming). \"Show identity\" reveals them.",
+                       "UDID, seri no ve MAC adresleri ekranda ve kayıtlarda gizli tutulur (video çekerken görünmesin diye). \"Kimliği göster\" ile açılır."))
+            }
         }
     }
 
@@ -117,7 +144,7 @@ struct ContentView: View {
                 Button(link.hasSavedPairing ? L("Pair (saved key)", "Eşleş (kayıtlı anahtarla)") : L("Pair", "Eşleş")) { link.pair() }
                     .disabled(!link.huaweiChannelReady || link.busy != nil)
                     .fontWeight(.semibold)
-            } else {
+            } else if !filmMode {
                 Button(L("Refresh battery and watch info", "Pil ve saat bilgisini yenile")) { link.refresh() }
                     .disabled(link.busy != nil)
             }
@@ -125,11 +152,17 @@ struct ContentView: View {
         } header: {
             Text(L("Watch", "Saat"))
         } footer: {
-            if !link.isPaired && !link.hasSavedPairing {
+            if !link.isPaired && !link.hasSavedPairing && !filmMode {
                 Text(L("Close Huawei Health before pairing (swipe it up in the app switcher). The watch may ask for confirmation the first time.",
                        "Eşleşmeden önce Huawei Health'i kapat (uygulama değiştiriciden yukarı kaydır). İlk eşleşmede saatin ekranında onay çıkabilir."))
             }
         }
+    }
+
+    private var visibleApps: [BundledWatchApp] {
+        guard filmMode else { return WatchAppCatalog.all }
+        let hidden = Set(link.features.flatMap(\.filmModeHiddenApps))
+        return WatchAppCatalog.all.filter { !hidden.contains($0.name) }
     }
 
     private var watchAppsSection: some View {
@@ -137,7 +170,12 @@ struct ContentView: View {
             if let progress = link.watchAppProgress {
                 ProgressView(value: progress) { Text(L("Uploading… \(Int(progress * 100))%", "Yükleniyor… %\(Int(progress * 100))")) }
             }
-            ForEach(WatchAppCatalog.all) { app in
+            if filmMode, let status = link.appInstallStatus, link.watchAppProgress == nil {
+                Label(status.text, systemImage: status.ok == true ? "checkmark.circle.fill" : status.ok == false ? "xmark.octagon.fill" : "hourglass")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(status.ok == true ? .green : status.ok == false ? .red : .secondary)
+            }
+            ForEach(visibleApps) { app in
                 Button { link.installWatchApp(app) } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L("Install \(app.name) on the watch", "\(app.name) uygulamasını saate kur")).fontWeight(.semibold)
@@ -163,10 +201,43 @@ struct ContentView: View {
         } header: {
             Text(L("Watch apps", "Saat uygulamaları"))
         } footer: {
-            if WatchAppCatalog.all.isEmpty {
+            if WatchAppCatalog.all.isEmpty && !filmMode {
                 Text(L("No watch app is bundled yet. Apps built with tools/build-watch-app.sh land in WatchApps/ and show up here with an \"Install\" button (see README).",
                        "Uygulamanın içinde saat uygulaması yok. tools/build-watch-app.sh ile derlenen .bin dosyaları WatchApps/ klasörüne düşer ve burada \"Kur\" düğmesi olarak çıkar (README)."))
             }
+        }
+    }
+
+    private var watchFaceSection: some View {
+        Section {
+            if let status = link.watchFaceStatus {
+                if let progress = link.watchAppProgress {
+                    ProgressView(value: progress) { Text(status + " " + L("\(Int(progress * 100))%", "%\(Int(progress * 100))")).font(.callout) }
+                } else {
+                    Text(status).font(.callout)
+                }
+            }
+            ForEach(WatchFaceCatalog.all, id: \.self) { url in
+                let name = url.deletingPathExtension().lastPathComponent
+                Button(L("Install the \(name) watch face", "\(name) kadranını saate kur")) { link.installWatchFace(url, title: name) }
+                    .disabled(link.busy != nil)
+                    .fontWeight(.semibold)
+            }
+            if !filmMode {
+                Button(L("Install a watch face (.hwt)", "Saate kadran yükle (.hwt)")) { pickingWatchFace = true }
+                    .disabled(link.busy != nil)
+                    .fontWeight(WatchFaceCatalog.all.isEmpty ? .semibold : .regular)
+            }
+        } header: {
+            Text(L("Watch faces", "Kadranlar"))
+        } footer: {
+            if !filmMode {
+                Text(L("Watch faces made with Huawei Theme Studio (.hwt). After the upload, touch and hold the watch face on the watch and pick the new one.",
+                       "Huawei Theme Studio ile yapılan kadranlar (.hwt). Yükleme bitince saatte kadrana basılı tut ve yenisini seç."))
+            }
+        }
+        .fileImporter(isPresented: $pickingWatchFace, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first { link.installWatchFace(url) }
         }
     }
 
@@ -212,6 +283,10 @@ struct ContentView: View {
             HStack {
                 Text(L("Log (newest first)", "Log (en yeni üstte)"))
                 Spacer()
+                Button(L("Clear", "Temizle"), systemImage: "trash") { link.clearLog() }
+                    .labelStyle(.iconOnly)
+                    .disabled(link.log.isEmpty)
+                if !filmMode {
                 Button(copied ? L("Copied", "Kopyalandı") : L("Copy", "Kopyala")) {
                     UIPasteboard.general.string = link.logText
                     copied = true
@@ -221,6 +296,7 @@ struct ContentView: View {
                     }
                 }
                 ShareLink(item: link.logText) { Image(systemName: "square.and.arrow.up") }
+                }
             }
             .textCase(nil)
         }

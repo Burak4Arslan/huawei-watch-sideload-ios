@@ -112,10 +112,16 @@ enum FileUpload {
     static let success = 100000
 
     static func info(fileName: String, size: Int, type: UInt8) -> HuaweiTLV {
-        HuaweiTLV()
+        var tlv = HuaweiTLV()
             .with(0x01, Array(fileName.utf8))
             .with(0x02, .bigEndian(UInt32(size)))
             .with(0x03, [type])
+        // Watch faces also carry name and version, taken from "<name>_<version>" (Gadgetbridge FileUpload.FileInfoSend)
+        if type == FileType.watchface {
+            let parts = fileName.split(separator: "_", maxSplits: 1).map(String.init)
+            tlv = tlv.with(0x05, Array(parts[0].utf8)).with(0x06, Array((parts.count > 1 ? parts[1] : "1.0.0").utf8))
+        }
+        return tlv
     }
 
     static func hash(fileId: UInt8, sha256: [UInt8]) -> HuaweiTLV {

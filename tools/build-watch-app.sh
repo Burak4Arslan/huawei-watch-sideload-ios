@@ -110,6 +110,12 @@ if grep -q 'COMPILE RESULT:FAIL' "$BUILD/compile.log" || [ ! -f "$BUILD/loader_o
   fail "compile failed ($BUILD/compile.log)"
 fi
 
+# The image converter writes every picture twice for API <= 6 (x.bin for older runtimes, x.png.bin for newer ones),
+# raw at 4 bytes per pixel. HUASIDELOAD_LEGACY_IMAGES=1 keeps only x.bin, which halves big apps (the simulator reads either)
+if [ "${HUASIDELOAD_LEGACY_IMAGES:-}" = 1 ]; then
+  find "$BUILD/loader_out_lite" -name '*.png.bin' -delete
+fi
+
 echo "3/5 restool"
 "$SDK/toolchains/restool" -i "$MAIN" -p "$BUNDLE" \
   -o "$BUILD/res" -r "$BUILD/res/ResourceTable.txt" -j "$MAIN/config.json" -f | tail -1

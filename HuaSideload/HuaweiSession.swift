@@ -606,9 +606,9 @@ final class HuaweiSession {
         }
     }
 
-    func sendNotification(title: String, text: String) async throws {
+    func sendNotification(title: String, text: String, appId: String? = Bundle.main.bundleIdentifier) async throws {
         notificationId &+= 1
-        let tlv = WatchNotification.request(id: notificationId, title: title, sender: title, text: text)
+        let tlv = WatchNotification.request(id: notificationId, title: title, sender: AppInfo.displayName, text: text, appId: appId)
         do {
             let response = try await request(WatchNotification.serviceId, WatchNotification.commandId, tlv,
                                              label: L("Notification", "Bildirim"), timeout: 5)

@@ -38,7 +38,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .tabItem { Label(L("Watch", "Saat"), systemImage: "applewatch") }
+            .tabItem { Label(L("Watch", "Saat"), systemImage: "watch.analog") }
             .tag(Tab.watch)
 
             page(L("Install", "Yükle")) {

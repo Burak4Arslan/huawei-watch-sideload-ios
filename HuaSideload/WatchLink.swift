@@ -95,6 +95,10 @@ final class WatchLink: NSObject, ObservableObject {
         }
         session.onAppMessage = { [weak self] source, data in
             guard let self else { return }
+            if source == NotificationIcon.watchPackage {
+                self.notificationIconMessage(data)
+                return
+            }
             guard let bridge = self.bridge(for: source) else {
                 self.append(.info, L("P2P data from \(source) (\(data.count) bytes), this package is not bundled in the app", "Saatten P2P veri: \(source) (\(data.count) bayt), bu paket uygulamanın içinde yok"))
                 return
@@ -300,6 +304,61 @@ final class WatchLink: NSObject, ObservableObject {
             }
             self.features.forEach { $0.watchPaired() }
             try await self.refreshInfo(session)
+            Task { await self.offerNotificationIcon(session) }
+        }
+    }
+
+    // MARK: Notification icon (see NotificationIcon)
+
+    // After pairing: offer this app to the watch's notification icon service (it answers if it needs the icon)
+    private func offerNotificationIcon(_ session: HuaweiSession) async {
+        do {
+            let reply = try await sendToIconService(NotificationIcon.offer())
+            if let code = reply.code, code != P2P.Code.ok {
+                append(.info, String(format: L("Notification icon: the watch did not take the offer (0x%X)", "Bildirim ikonu: saat teklifi almadı (0x%X)"), code))
+            }
+        } catch {
+            append(.info, L("Notification icon: the watch has no icon service (\(error))", "Bildirim ikonu: saatte ikon servisi yok (\(error))"))
+        }
+    }
+
+    private func sendToIconService(_ data: [UInt8]) async throws -> P2P.Message {
+        try await session.p2p(kind: P2P.Kind.data, source: NotificationIcon.phoneModule, destination: NotificationIcon.watchPackage,
+                              sourceFingerprint: NotificationIcon.phoneFingerprint, destinationFingerprint: NotificationIcon.watchFingerprint,
+                              data: data)
+    }
+
+    private func notificationIconMessage(_ data: [UInt8]) {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(data)) as? [String: Any],
+              let type = json["msgType"] as? Int, let body = json["msgBody"] as? [String: Any] else { return }
+        let retCode = body["retCode"] as? Int ?? 0
+        switch (type, retCode) {
+        case (6001, 10001...10003):
+            let width = body["iconWidth"] as? Int ?? 0, height = body["iconHeight"] as? Int ?? 0
+            guard width > 0, height > 0, width <= 512, height <= 512, let icon = NotificationIcon.iconData(width: width, height: height) else {
+                append(.error, L("Notification icon: could not prepare the app icon", "Bildirim ikonu: uygulama ikonu hazırlanamadı"))
+                return
+            }
+            append(.info, L("Notification icon: the watch wants a \(width)×\(height) icon, sending…", "Bildirim ikonu: saat \(width)×\(height) ikon istiyor, gönderiliyor…"))
+            inBackground("Notification icon") {
+                do {
+                    let addressee = FileUpload.Addressee(source: NotificationIcon.phoneModule, destination: NotificationIcon.watchPackage,
+                                                         sourceFingerprint: NotificationIcon.phoneFingerprint,
+                                                         destinationFingerprint: NotificationIcon.watchFingerprint)
+                    try await self.session.uploadFile(icon, name: NotificationIcon.fileName(for: retCode), type: NotificationIcon.fileType,
+                                                      to: addressee) { _ in }
+                    _ = try await self.sendToIconService(NotificationIcon.uploaded(for: retCode))
+                    self.append(.success, L("Notification icon sent: this app's notifications show its icon now", "Bildirim ikonu gönderildi: bu uygulamanın bildirimleri artık kendi ikonuyla görünür"))
+                } catch {
+                    self.append(.error, L("Notification icon could not be sent: \(error)", "Bildirim ikonu gönderilemedi: \(error)"))
+                }
+            }
+        case (6001, 10004), (6001, 10005):
+            append(.info, L("Notification icon: the watch already has it", "Bildirim ikonu: saatte zaten var"))
+        case (6002, _):
+            append(.info, L("Notification icon: the watch closed the exchange (\(retCode))", "Bildirim ikonu: saat alışverişi kapattı (\(retCode))"))
+        default:
+            append(.info, L("Notification icon service: ", "Bildirim ikonu servisi: ") + String(decoding: data.prefix(300), as: UTF8.self))
         }
     }
 

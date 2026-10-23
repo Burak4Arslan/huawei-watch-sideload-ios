@@ -111,7 +111,10 @@ enum FileUpload {
 
     static let success = 100000
 
-    static func info(fileName: String, size: Int, type: UInt8) -> HuaweiTLV {
+    // Files for a service on the watch (e.g. a notification icon) are addressed like P2P messages
+    struct Addressee { let source: String; let destination: String; let sourceFingerprint: String; let destinationFingerprint: String }
+
+    static func info(fileName: String, size: Int, type: UInt8, to addressee: Addressee? = nil) -> HuaweiTLV {
         var tlv = HuaweiTLV()
             .with(0x01, Array(fileName.utf8))
             .with(0x02, .bigEndian(UInt32(size)))
@@ -120,6 +123,10 @@ enum FileUpload {
         if type == FileType.watchface {
             let parts = fileName.split(separator: "_", maxSplits: 1).map(String.init)
             tlv = tlv.with(0x05, Array(parts[0].utf8)).with(0x06, Array((parts.count > 1 ? parts[1] : "1.0.0").utf8))
+        }
+        if let addressee {
+            tlv = tlv.with(0x08, Array(addressee.source.utf8)).with(0x09, Array(addressee.destination.utf8)).with(0x0A)
+                .with(0x0B, Array(addressee.sourceFingerprint.utf8)).with(0x0C, Array(addressee.destinationFingerprint.utf8))
         }
         return tlv
     }

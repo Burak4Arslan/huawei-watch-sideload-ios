@@ -385,7 +385,11 @@ enum WatchNotification {
             .with(0x02, [appId == nil ? typeSms : typeGeneric])
             .with(0x03, [0x01])
             .with(0x84, HuaweiTLV().with(0x8C, list.serialize()).serialize())
-        if let appId { tlv = tlv.with(0x11, Array(appId.prefix(127).utf8)) }
+        if let appId {
+            tlv = tlv.with(0x11, Array(appId.prefix(127).utf8))
+            // Watches with an icon service (Gadgetbridge supportsNotificationsAddIconTimestamp) also want the time
+            tlv = tlv.with(0x15, .bigEndian(UInt32(Date().timeIntervalSince1970)))
+        }
         return tlv
     }
 }

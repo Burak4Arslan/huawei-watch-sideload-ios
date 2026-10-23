@@ -476,14 +476,15 @@ final class HuaweiSession {
     }
 
     // Uploads a file to the watch (app: type 6, name "<package>_INSTALL"; music: type 2). The watch drives the flow.
-    func uploadFile(_ data: [UInt8], name: String, type: UInt8, progress: @escaping (Double) -> Void) async throws {
+    func uploadFile(_ data: [UInt8], name: String, type: UInt8, to addressee: FileUpload.Addressee? = nil,
+                    progress: @escaping (Double) -> Void) async throws {
         guard upload == nil else { throw HuaweiAuthError.unexpected(L("another upload is running", "zaten bir yükleme sürüyor")) }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             upload = Upload(data: data, sha256: HCrypto.sha256(data), progress: progress, continuation: continuation)
             Task {
                 do {
                     let response = try await request(FileUpload.serviceId, FileUpload.Command.info,
-                                                     FileUpload.info(fileName: name, size: data.count, type: type),
+                                                     FileUpload.info(fileName: name, size: data.count, type: type, to: addressee),
                                                      label: L("File info (\(name), \(data.count) bytes)", "Dosya bilgisi (\(name), \(data.count) bayt)"))
                     if let result = response.tlv?.int(0x7F), result != FileUpload.success {
                         finishUpload(HuaweiAuthError.watchError(FileUpload.describe(error: result)))

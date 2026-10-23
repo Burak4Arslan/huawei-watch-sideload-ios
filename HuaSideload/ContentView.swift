@@ -8,6 +8,7 @@ struct ContentView: View {
     @AppStorage(AppLanguage.storageKey) private var language = AppLanguage.current.rawValue
     @State private var copied = false
     @State private var message = ""
+    @FocusState private var messageFocused: Bool
     @State private var pickingMusic = false
     @State private var pickingWatchFace = false
     // Filming mode: only what a video needs (no log controls, no feature sections, no identity buttons).
@@ -84,6 +85,7 @@ struct ContentView: View {
     private func page<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             List { content() }
+                .scrollDismissesKeyboard(.interactively)
                 .navigationTitle(title)
                 .toolbar {
                     if filmModeOffered {
@@ -318,7 +320,17 @@ struct ContentView: View {
         Section(L("Send a notification to the watch", "Saate bildirim gönder")) {
             TextField(L("Message", "Mesaj"), text: $message, axis: .vertical)
                 .lineLimit(1...4)
-            Button(L("Send", "Gönder")) { link.sendMessage(message) }
+                .focused($messageFocused)
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button(L("Done", "Bitti")) { messageFocused = false }
+                    }
+                }
+            Button(L("Send", "Gönder")) {
+                messageFocused = false
+                link.sendMessage(message)
+            }
                 .disabled(link.busy != nil || message.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }

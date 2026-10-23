@@ -375,6 +375,7 @@ encrypted with AES-GCM.
 - **Installing:** the file is uploaded over `0x28` as type 6; the watch reports progress and the result with `0x2A/0x02` (102 installed, 103 failed).
 - **Music:** uploaded as type 2; the watch then asks for the song title with `0x25/0x09`.
 - **Watch faces:** only `watchface.bin` from inside the `.hwt` is uploaded, as type 1, with a name and version (like Gadgetbridge).
+- **Notifications:** sent as an app notification (type `0x7F`) with the app's ID (tag `0x11`); the watch shows its built-in icon for apps it knows. After pairing, the app also offers its own icon to the watch's notification icon service (`in.huawei.NotificationAppIcon` over P2P; the watch asks for the sizes it wants, file type 7). Tested on a GT 3 SE: it takes the icons but keeps showing the default icon. Gadgetbridge reports that uploaded notification icons need HarmonyOS 5 or later.
 - **Messaging with watch apps:** Wear Engine P2P (`0x34`). A watch app's identity is `package + "_" + base64(EC public key of the developer certificate)`; `WatchAppCatalog` derives it from the profile inside the `.bin`.
 - **UDID:** the watch sends its UDID on every pairing, in tag `0x05` of the security negotiation reply (`0x01/0x33`).
 - **Background:** `CBCentralManager` with a restore identifier (CoreBluetooth state restoration). If iOS terminates the app, it keeps the pending connection and relaunches the app for the watch's events; the app then sets up the channel and pairs again with the saved key.

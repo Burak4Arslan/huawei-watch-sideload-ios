@@ -49,6 +49,8 @@ protocol WatchFeatureHost: AnyObject {
     func showOnMusicScreen(top: String, main: String, playing: Bool, volumePercent: Int)
     // A vibrating notification on the watch
     func notify(title: String, text: String)
+    // Phone audio through the watch speaker (rings the watch; see WatchSpeaker)
+    var speaker: WatchSpeaker { get }
     // Events from the watch wake the app in the background; this asks iOS for time until the work is done
     func inBackground(_ name: String, _ work: @escaping () async -> Void)
     func log(_ kind: LogKind, _ text: String)

@@ -166,7 +166,10 @@ final class HuaweiSession {
             onAppInstallStatus?(status, package)
             return
         }
-        guard isPaired, packet.serviceId == MusicControl.serviceId, let tlv = packet.tlv else { return }
+        guard isPaired, packet.serviceId == MusicControl.serviceId, let tlv = packet.tlv else {
+            logUnhandled(packet)
+            return
+        }
         switch packet.commandId {
         case MusicControl.statusCommand:
             if let status = tlv.int(0x7F), status != HuaweiPacket.resultSuccess { return }
@@ -183,8 +186,19 @@ final class HuaweiSession {
             send(MusicControl.serviceId, MusicControl.controlCommand, MusicControl.ack())
             onMusicButton?(raw.flatMap(MusicControl.Button.init(rawValue:)), volume)
         default:
-            break
+            logUnhandled(packet)
         }
+    }
+
+    // Diagnostics, off by default: log unsolicited packets that nothing handles, e.g. to find out whether a button on
+    // the watch sends anything. A feature turns it on with the UserDefaults key "HuaSideloadLogUnhandledPackets".
+    private func logUnhandled(_ packet: HuaweiPacket) {
+        guard UserDefaults.standard.bool(forKey: "HuaSideloadLogUnhandledPackets") else { return }
+        let tags = packet.tlv?.items.map { item in
+            String(format: "%02X=", item.tag) + (item.value.count <= 8 ? item.value.map { String(format: "%02X", $0) }.joined() : "\(item.value.count)B")
+        }.joined(separator: " ") ?? "\(packet.body.count)B"
+        log(.info, String(format: L("Unhandled packet from the watch: service 0x%02X, command 0x%02X", "Saatten işlenmeyen paket: servis 0x%02X, komut 0x%02X"),
+                          packet.serviceId, packet.commandId) + " [\(tags)]")
     }
 
     // MARK: - Sending

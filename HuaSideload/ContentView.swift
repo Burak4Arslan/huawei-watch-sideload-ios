@@ -28,6 +28,7 @@ struct ContentView: View {
                     if link.isPaired {
                         watchAppsSection
                         watchFaceSection
+                        WatchSpeakerSection(speaker: link.speaker)
                         if !filmMode { musicSection }
                         notificationSection
                         // Feature sections (navigation, remote control etc.): only when paired, at the bottom, never in filming mode

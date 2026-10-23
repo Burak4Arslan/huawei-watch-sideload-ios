@@ -32,7 +32,8 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         NSBluetoothAlwaysUsageDescription: Needed to connect to your Huawei watch over Bluetooth.
-        UIBackgroundModes: [bluetooth-central]
+        # voip: the watch speaker rings the watch with a CallKit call (refused without it); audio: keeps it playing when locked
+        UIBackgroundModes: [bluetooth-central, audio, voip]
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
     settings:

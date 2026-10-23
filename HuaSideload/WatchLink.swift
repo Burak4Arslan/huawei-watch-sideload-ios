@@ -56,6 +56,7 @@ final class WatchLink: NSObject, ObservableObject {
     private let parser = HuaweiPacketParser()
     private var session: HuaweiSession!
     let features: [WatchFeature]
+    let speaker = WatchSpeaker()
     private var bridges: [String: WatchAppBridge] = [:]
 
     // Reconnect and pair again automatically when the connection drops
@@ -65,6 +66,7 @@ final class WatchLink: NSObject, ObservableObject {
     override init() {
         features = WatchFeatures.load()
         super.init()
+        speaker.log = { [weak self] kind, text in self?.append(kind, text) }
         session = HuaweiSession(
             writeFrame: { [weak self] frame in self?.write(frame) },
             maxWriteLength: { [weak self] in self?.maxWriteLength ?? 182 },
@@ -103,7 +105,9 @@ final class WatchLink: NSObject, ObservableObject {
         append(.info, L("Features: ", "Özellikler: ") + features.map { String(describing: type(of: $0)) }.joined(separator: ", ")
                + L(" · bundled watch apps: ", " · paketli saat uygulamaları: ")
                + (WatchAppCatalog.all.isEmpty ? L("none", "yok") : WatchAppCatalog.all.map(\.name).joined(separator: ", ")))
-        central = CBCentralManager(delegate: self, queue: .main)
+        // State restoration: if iOS terminates the app in the background, it keeps the (pending) connection to the
+        // watch and relaunches the app for its Bluetooth events, so notifications and the watch's buttons keep working
+        central = CBCentralManager(delegate: self, queue: .main, options: [CBCentralManagerOptionRestoreIdentifierKey: "HuaSideloadCentral"])
     }
 
     private var musicScreenOwner: WatchFeature? { features.first { $0.ownsMusicScreen } }
@@ -236,6 +240,18 @@ final class WatchLink: NSObject, ObservableObject {
 
     // On launch, connect to the last used watch automatically
     private func reconnectLastWatch() {
+        // Relaunched by iOS with the watch restored (centralManager(_:willRestoreState:)): pick the connection up again
+        if let restored = peripheral, wantsConnection, !huaweiChannelReady, !isConnecting {
+            if restored.state == .connected {
+                connectedName = restored.name
+                append(.info, L("Still connected to \(restored.name ?? "the watch"), setting up the channel again…", "\(restored.name ?? "Saat") ile bağlantı sürüyor, kanal yeniden kuruluyor…"))
+                restored.discoverServices(nil)
+            } else {
+                isConnecting = true
+                central.connect(restored)
+            }
+            return
+        }
         guard peripheral == nil,
               let id = UserDefaults.standard.string(forKey: Self.lastWatchKey).flatMap(UUID.init(uuidString:)),
               let known = central.retrievePeripherals(withIdentifiers: [id]).first else { return }
@@ -714,6 +730,14 @@ extension WatchLink: @preconcurrency CBCentralManagerDelegate {
         }
         append(.info, "Bluetooth: \(bluetoothState)")
         if central.state == .poweredOn { reconnectLastWatch() }
+    }
+
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        guard let restored = (dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral])?.first else { return }
+        peripheral = restored
+        restored.delegate = self
+        wantsConnection = true
+        append(.info, L("iOS relaunched the app in the background for the watch", "iOS uygulamayı saat için arka planda yeniden açtı"))
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,

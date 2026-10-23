@@ -8,8 +8,9 @@ Huawei Health on iPhone can pair with a Huawei watch, but it cannot install thir
 music to the watch; Huawei only allows that from Android phones. **HuaSideload** is an iOS app that talks
 to Huawei *lite wearable* watches directly over Bluetooth LE: it pairs with the watch, **installs your own
 watch apps** (signed HarmonyOS/OpenHarmony lite JS apps, built with the included tools), **installs watch
-faces**, **uploads music** to the watch's player, and gives your watch apps a JSON message channel to the iPhone.
-Three ready-made games (Dino, Flappy, Snake) and two watch faces are included.
+faces**, **uploads music** to the watch's player, gives your watch apps a JSON message channel to the iPhone, and
+**plays the iPhone's audio on the watch speaker** (with a call trick). Three ready-made games (Dino, Flappy, Snake)
+and two watch faces are included.
 
 > **Huawei Health:** set the watch up once with Huawei Health as usual (language, region, terms). After that
 > HuaSideload pairs with the watch on its own and does not need Huawei Health. Setting up a brand-new or
@@ -36,7 +37,8 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 ## 1. What it does and doesn't do
 
 **Does:**
-- Pairs with the watch over BLE (HiChain), encrypted connection, automatic reconnect
+- Pairs with the watch over BLE (HiChain), encrypted connection, automatic reconnect; stays connected in the
+  background, even when iOS closes the app (it relaunches the app for the watch)
 - Battery and watch info, notifications to the watch
 - **Installs and removes your own watch apps** (signed `.bin` with a debug profile)
 - **Installs watch faces** (`.hwt` from Huawei Theme Studio); two ready-made faces are bundled
@@ -44,9 +46,13 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 - Uploads **MP3/M4A/AAC/FLAC/WAV/OPUS** to the watch's own music player (to listen without the phone)
 - **JSON messaging** between your watch apps and the phone (Wear Engine P2P)
 - Shows the watch's **UDID** (needed for the debug profile; no Android phone required)
+- **Plays the iPhone's audio on the watch speaker**: Spotify, Apple Music, YouTube, podcasts… (section 3.1)
 
 **Doesn't (at least for now, tried; limited by the watch hardware or iOS):**
-- Play iPhone audio (Spotify etc.) through the watch speaker: the watch is not an audio receiver (A2DP)
+- Music quality on the watch speaker: the watch is no Bluetooth music receiver (A2DP), so the audio goes over the
+  call channel at phone-call quality (section 3.1)
+- Skip songs of another app from the watch: iOS doesn't let one app control another app's player (a feature with
+  that player's own API can, see 3.1)
 - Upload DRM-protected songs (Spotify, Apple Music) to the watch
 - Give watch apps internet access (but the phone app can send them any data)
 
@@ -101,6 +107,37 @@ open HuaSideload.xcodeproj                     # pick your iPhone, Run
 **UDID:** after pairing it appears under Status, hidden. **Show identity** reveals it, **Copy UDID** copies it. You need it for the debug profile.
 
 **Language:** the globe menu (top right) switches between English and Turkish. The first launch follows the phone's language.
+
+**In the background:** leave HuaSideload in the background, don't swipe it away in the app switcher. If iOS closes it
+to free memory, iOS keeps the connection to the watch and opens the app again in the background when the watch needs
+it. After you swipe it away, open it once (after restarting the iPhone too, to be safe).
+
+### 3.1 Listening on the watch speaker
+
+The watch is no Bluetooth music receiver, but it has a speaker for calls, and it opens that speaker for an answered
+incoming call. HuaSideload rings the watch with such a call:
+
+1. **Watch speaker → Ring the watch and listen on its speaker.** The watch rings like a call ("HuaSideload").
+2. Answer it on the watch.
+3. Play something in any app on the iPhone: Spotify, Apple Music, YouTube, a podcast. It comes out of the watch speaker.
+4. Hang up on the watch (or **End** in the app) to stop.
+
+Good to know:
+- The watch has to be connected to the iPhone for calls. If phone or Teams calls ring on the watch, it is; if not, the
+  app says so (connect it in the iPhone's Bluetooth settings).
+- **Phone-call quality** (mono, voice bandwidth). If it crackles, turn the volume down a bit or pick an equalizer
+  preset that cuts bass (the speaker is tiny).
+- While it plays, the watch shows its call screen. It can't be left, and its buttons don't reach the phone: change
+  songs on the phone. The **volume** panel on the watch changes the iPhone's volume.
+- Nothing is recorded or captured: the app only plays silence to keep the call's audio route open, and the other
+  app's audio takes that route by itself.
+- Only an answered *incoming* call works. An outgoing call, or routing audio to the watch without a call, plays
+  nothing on the watch (tested).
+- **For features:** `host.speaker` (`WatchSpeaker`) tells when the speaker is on and off (`onPlaying`, `onEnded`), can
+  ring the watch (`ring()`), and reports gestures with the watch's volume panel (`onVolumeGesture`): down a little and
+  right back up, that twice, or down to the bottom and up again. The watch never changes the volume on its own, so a
+  feature can use them to control its own player, e.g. through the Spotify Web API. (The mic button can't be used
+  reliably: in quiet parts of a song the watch mutes its mic on its own too.)
 
 ---
 
@@ -291,6 +328,8 @@ Fixes to the core then reach both projects automatically.
 - **"Verification failed: the saved key is no longer valid":** the watch was reset. **Forget pairing** → **Pair** again.
 - **Install fails with 103:** see the table in section 5. Start with `python3 tools/check-watch-bin.py WatchApps/X.bin`.
 - **"Could not reach the phone (is HuaSideload open?)":** the iPhone app must be running and connected to the watch. It also works in the background, but not after you force-quit it.
+- **The watch loses the phone after a while:** check that HuaSideload wasn't swiped away (section 3, "In the background"). The log shows "iOS relaunched the app in the background for the watch" when iOS brought it back.
+- **Watch speaker: "not connected to the iPhone for calls":** in the iPhone's Bluetooth settings, tap the watch to connect it; calls must ring on the watch.
 - **Questions and bug reports:** [GitHub Issues](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues). Attach the log.
 - **Sharing the log:** **Copy** in the Log section. Identity details stay masked unless **Show identity** is on.
 - **Live log on a Mac** (unlock the iPhone first; every line starts with `[HuaSideload]`):
@@ -315,6 +354,7 @@ HuaSideload/               the iPhone app (SwiftUI)
   WatchAppBridge.swift     JSON messaging with a watch app
   WatchFeature.swift       plugin API
   WatchFacePackage.swift   reads .hwt watch face packages (minimal zip reader)
+  WatchSpeaker.swift       iPhone audio on the watch speaker (CallKit incoming call + HFP), volume gestures
   HelloFeature.swift       sample feature
   Localization.swift       English / Turkish
 watch-apps/sample/         sample watch app (lite wearable JS)
@@ -337,6 +377,8 @@ encrypted with AES-GCM.
 - **Watch faces:** only `watchface.bin` from inside the `.hwt` is uploaded, as type 1, with a name and version (like Gadgetbridge).
 - **Messaging with watch apps:** Wear Engine P2P (`0x34`). A watch app's identity is `package + "_" + base64(EC public key of the developer certificate)`; `WatchAppCatalog` derives it from the profile inside the `.bin`.
 - **UDID:** the watch sends its UDID on every pairing, in tag `0x05` of the security negotiation reply (`0x01/0x33`).
+- **Background:** `CBCentralManager` with a restore identifier (CoreBluetooth state restoration). If iOS terminates the app, it keeps the pending connection and relaunches the app for the watch's events; the app then sets up the channel and pairs again with the saved key.
+- **Watch speaker:** a CallKit *incoming* call (`reportNewIncomingCall`); after it is answered on the watch, `AVAudioSession` `.playAndRecord` with `.allowBluetooth` (HFP) and `.mixWithOthers`, playing silence to keep the route open. Needs `UIBackgroundModes` `voip` (without it CallKit refuses the call) and `audio`. The volume panel on the watch shows up as `outputVolume` changes on the iPhone.
 
 The build pipeline is the command-line equivalent of DevEco Studio's "legacy lite" build:
 ace-loader (webpack lite) → restool → haptobin_tool → hap-sign-tool `sign-app -inForm bin`.

@@ -368,19 +368,24 @@ enum WatchNotification {
     private static let textTypeSender: UInt8 = 0x02
     private static let textTypeTitle: UInt8 = 0x03
     private static let typeSms: UInt8 = 0x02
+    // An app's notification (Gadgetbridge NotificationType.generic); with the app's ID (tag 0x11) the watch shows
+    // it as coming from that app instead of as a text message
+    private static let typeGeneric: UInt8 = 0x7F
     private static let contentFormat: UInt8 = 0x02   // Gadgetbridge: "Always 0x02"
 
-    static func request(id: UInt16, title: String, sender: String, text: String) -> HuaweiTLV {
+    static func request(id: UInt16, title: String, sender: String, text: String, appId: String? = nil) -> HuaweiTLV {
         let elements = [(textTypeTitle, title), (textTypeSender, sender), (textTypeText, text)].map { type, value -> [UInt8] in
             var element = HuaweiTLV().with(0x0E, [type]).with(0x0F, [contentFormat])
             if !value.isEmpty { element = element.with(0x10, Array(value.utf8)) }
             return element.serialize()
         }
         let list = elements.reduce(HuaweiTLV()) { $0.with(0x8D, $1) }
-        return HuaweiTLV()
+        var tlv = HuaweiTLV()
             .with(0x01, .bigEndian(id))
-            .with(0x02, [typeSms])
+            .with(0x02, [appId == nil ? typeSms : typeGeneric])
             .with(0x03, [0x01])
             .with(0x84, HuaweiTLV().with(0x8C, list.serialize()).serialize())
+        if let appId { tlv = tlv.with(0x11, Array(appId.prefix(127).utf8)) }
+        return tlv
     }
 }

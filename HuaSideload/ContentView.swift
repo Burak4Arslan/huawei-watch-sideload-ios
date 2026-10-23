@@ -85,6 +85,8 @@ struct ContentView: View {
     private func page<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             List { content() }
+                // Feature sections don't know about the language: rebuild the list when it changes
+                .id(language)
                 .scrollDismissesKeyboard(.interactively)
                 .navigationTitle(title)
                 .toolbar {

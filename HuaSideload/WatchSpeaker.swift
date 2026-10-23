@@ -26,9 +26,10 @@ final class WatchSpeaker: NSObject, ObservableObject, CXProviderDelegate {
 
     // Name shown for the call on the watch and the iPhone
     var callerName = AppInfo.displayName
-    // Button title and footer of the section; features can name and explain what they add
-    var buttonTitle: String?
-    var footer: String?
+    // Button title and footer of the section; features can name and explain what they add (built on every
+    // redraw, so a language switch shows at once)
+    var buttonTitle: (() -> String)?
+    var footer: (() -> String)?
     var log: (LogKind, String) -> Void = { _, _ in }
     // The speaker is on / the call ended
     var onPlaying: (() -> Void)?
@@ -321,7 +322,7 @@ struct WatchSpeakerSection: View {
         Section {
             switch speaker.state {
             case .idle:
-                Button(speaker.buttonTitle ?? L("Play the phone's audio on the watch", "Telefonun sesini saate yansıt")) { speaker.ring() }
+                Button(speaker.buttonTitle?() ?? L("Play the phone's audio on the watch", "Telefonun sesini saate yansıt")) { speaker.ring() }
                     .fontWeight(.semibold)
             case .ringing:
                 Label(L("The watch is ringing: answer it on the watch", "Saat çalıyor: saatten aç"), systemImage: "phone.arrow.down.left")
@@ -340,7 +341,7 @@ struct WatchSpeakerSection: View {
         } header: {
             Text(L("Watch speaker", "Saatin hoparlörü"))
         } footer: {
-            Text(speaker.footer ?? L("The watch rings like a call. Answer it on the watch, then play something in any app on the iPhone (Spotify, Apple Music, a podcast…): it comes out of the watch speaker at phone-call quality. Hang up on the watch to stop. The watch has to be connected to the iPhone for calls.",
+            Text(speaker.footer?() ?? L("The watch rings like a call. Answer it on the watch, then play something in any app on the iPhone (Spotify, Apple Music, a podcast…): it comes out of the watch speaker at phone-call quality. Hang up on the watch to stop. The watch has to be connected to the iPhone for calls.",
                                      "Saat arama gibi çalar. Saatten aç, sonra iPhone'da herhangi bir uygulamada (Spotify, Apple Music, podcast…) bir şey çal: saatin hoparlöründen telefon görüşmesi kalitesinde çıkar. Saatten kapatınca biter. Saatin aramalar için iPhone'a bağlı olması gerekir."))
         }
     }

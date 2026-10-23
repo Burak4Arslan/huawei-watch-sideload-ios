@@ -98,13 +98,16 @@ open HuaSideload.xcodeproj                     # pick your iPhone, Run
 - **Team ID:** Xcode → Settings → Accounts → your account → Team. You can also leave it empty and pick the team in Xcode under *Signing & Capabilities*.
 - **Bundle ID:** something unique, e.g. `com.yourname.huasideload`. Your watch apps send their messages to this ID.
 
+**The app** has four tabs: **Watch** (status, pairing, a notification to the watch), **Install** (watch apps,
+watch faces, music for the watch's player), **Features** (the watch speaker and your own features) and **Log**.
+
 **Pairing** (the watch must have been set up once with Huawei Health):
 1. Close Huawei Health (swipe it up in the app switcher).
-2. HuaSideload → **Find watch** → tap your watch. If it is connected to Huawei Health it shows up as "connected to phone".
+2. **Watch** tab → **Find watch** → tap your watch. If it is connected to Huawei Health it shows up as "connected to phone".
 3. **Pair**. If the watch asks for confirmation, accept it.
 4. From then on HuaSideload reconnects and pairs automatically.
 
-**UDID:** after pairing it appears under Status, hidden. **Show identity** reveals it, **Copy UDID** copies it. You need it for the debug profile.
+**UDID:** after pairing it appears on the **Watch** tab under Status, hidden. **Show identity** reveals it, **Copy UDID** copies it. You need it for the debug profile.
 
 **Language:** the globe menu (top right) switches between English and Turkish. The first launch follows the phone's language.
 
@@ -186,7 +189,7 @@ tools/build-watch-app.sh watch-apps/my-app     # → WatchApps/My App.bin  (file
 ./generate.sh                                  # adds the new .bin to the Xcode project
 ```
 1. Run the iPhone app from Xcode again.
-2. HuaSideload → **Watch apps** → **"Install … on the watch"**.
+2. **Install** tab → **Watch apps** → **"Install … on the watch"**.
 3. When it's done the app appears in the watch's app list. To remove it: **Show apps on the watch** → **Delete**.
 
 At the end `build-watch-app.sh` checks the package against the watch installer's rules with
@@ -218,7 +221,7 @@ final class MyFeature: WatchFeature {
 }
 ```
 Add it in `WatchFeatures.load()`, or keep it in a separate project as described in section 6.
-A feature can also put its own sections on the main screen (`sections()`).
+A feature can also put its own sections on the **Features** tab (`sections()`).
 
 ### 4.5 Ready-made games: Dino, Flappy, Snake
 
@@ -243,7 +246,7 @@ inside each game folder.
 ### 4.6 Watch faces
 
 Watch faces don't need a debug profile. Every `.hwt` in `WatchFaces/` is bundled into the iPhone app and shows up
-under **Watch faces** with an install button; **Install a watch face (.hwt)** uploads any other `.hwt` file.
+on the **Install** tab under **Watch faces** with an install button; **Install a watch face (.hwt)** uploads any other `.hwt` file.
 After the upload, touch and hold the watch face on the watch and pick the new one.
 
 | | | |
@@ -331,7 +334,7 @@ Fixes to the core then reach both projects automatically.
 - **The watch loses the phone after a while:** check that HuaSideload wasn't swiped away (section 3, "In the background"). The log shows "iOS relaunched the app in the background for the watch" when iOS brought it back.
 - **Watch speaker: "not connected to the iPhone for calls":** in the iPhone's Bluetooth settings, tap the watch to connect it; calls must ring on the watch.
 - **Questions and bug reports:** [GitHub Issues](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues). Attach the log.
-- **Sharing the log:** **Copy** in the Log section. Identity details stay masked unless **Show identity** is on.
+- **Sharing the log:** **Copy** on the **Log** tab. Identity details stay masked unless **Show identity** is on.
 - **Live log on a Mac** (unlock the iPhone first; every line starts with `[HuaSideload]`):
   ```bash
   xcrun devicectl list devices    # shows your iPhone's identifier, e.g. 00008110-001A2B3C4D5E6F70

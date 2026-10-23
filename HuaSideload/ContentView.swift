@@ -16,28 +16,18 @@ struct ContentView: View {
     private var filmModeOffered: Bool { link.features.contains { $0.offersFilmMode } }
     private var filmMode: Bool { filmModeOffered && filmModeOn }
 
-    var body: some View {
-        NavigationStack {
-            List {
-                statusSection
+    enum Tab: Hashable { case watch, install, features, log }
+    @State private var tab: Tab = .watch
 
+    var body: some View {
+        TabView(selection: $tab) {
+            page(AppInfo.displayName) {
+                statusSection
                 if link.connectedName == nil && !link.isConnecting {
                     devicesSection
                 } else {
                     watchSection
-                    if link.isPaired {
-                        watchAppsSection
-                        watchFaceSection
-                        WatchSpeakerSection(speaker: link.speaker)
-                        if !filmMode { musicSection }
-                        notificationSection
-                        // Feature sections (navigation, remote control etc.): only when paired, at the bottom, never in filming mode
-                        if !filmMode {
-                            ForEach(link.features.indices, id: \.self) { index in
-                                link.features[index].sections()
-                            }
-                        }
-                    }
+                    if link.isPaired { notificationSection }
                     if link.hasSavedPairing && !filmMode {
                         Section {
                             Button(L("Forget pairing", "Eşleşmeyi unut"), role: .destructive) { link.forgetPairing() }
@@ -47,34 +37,85 @@ struct ContentView: View {
                         }
                     }
                 }
+            }
+            .tabItem { Label(L("Watch", "Saat"), systemImage: "applewatch") }
+            .tag(Tab.watch)
 
+            page(L("Install", "Yükle")) {
+                if link.isPaired {
+                    watchAppsSection
+                    watchFaceSection
+                    if !filmMode { musicSection }
+                } else {
+                    pairFirstSection
+                }
+            }
+            .tabItem { Label(L("Install", "Yükle"), systemImage: "square.and.arrow.down") }
+            .tag(Tab.install)
+
+            page(L("Features", "Özellikler")) {
+                if link.isPaired {
+                    WatchSpeakerSection(speaker: link.speaker)
+                    // Feature sections (navigation, remote control etc.); never in filming mode
+                    if !filmMode {
+                        ForEach(link.features.indices, id: \.self) { index in
+                            link.features[index].sections()
+                        }
+                    }
+                } else {
+                    pairFirstSection
+                }
+            }
+            .tabItem { Label(L("Features", "Özellikler"), systemImage: "sparkles") }
+            .tag(Tab.features)
+
+            page(L("Log", "Log")) {
                 logSection
             }
-            .navigationTitle(AppInfo.displayName)
-            // While filming, identities (UDID, serial number, MAC) always stay masked, in the log too
-            .onAppear { if filmMode { link.revealIdentity = false } }
-            .onChange(of: filmMode) { _, on in if on { link.revealIdentity = false } }
-            .toolbar {
-                if filmModeOffered {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button { filmModeOn.toggle() } label: {
-                            Label(L("Filming", "Çekim"), systemImage: filmMode ? "video.fill" : "video")
-                                .labelStyle(.titleAndIcon)
+            .tabItem { Label(L("Log", "Log"), systemImage: "list.bullet.rectangle") }
+            .tag(Tab.log)
+        }
+        // While filming, identities (UDID, serial number, MAC) always stay masked, in the log too
+        .onAppear { if filmMode { link.revealIdentity = false } }
+        .onChange(of: filmMode) { _, on in if on { link.revealIdentity = false } }
+    }
+
+    // One tab: a list with the title and the shared toolbar (filming mode, language)
+    private func page<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        NavigationStack {
+            List { content() }
+                .navigationTitle(title)
+                .toolbar {
+                    if filmModeOffered {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { filmModeOn.toggle() } label: {
+                                Label(L("Filming", "Çekim"), systemImage: filmMode ? "video.fill" : "video")
+                                    .labelStyle(.titleAndIcon)
+                            }
+                            .tint(filmMode ? .red : nil)
                         }
-                        .tint(filmMode ? .red : nil)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Picker(L("Language", "Dil"), selection: $language) {
+                                ForEach(AppLanguage.allCases) { Text($0.title).tag($0.rawValue) }
+                            }
+                        } label: {
+                            Image(systemName: "globe")
+                        }
+                        .accessibilityLabel(L("Language", "Dil"))
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker(L("Language", "Dil"), selection: $language) {
-                            ForEach(AppLanguage.allCases) { Text($0.title).tag($0.rawValue) }
-                        }
-                    } label: {
-                        Image(systemName: "globe")
-                    }
-                    .accessibilityLabel(L("Language", "Dil"))
-                }
-            }
+        }
+    }
+
+    private var pairFirstSection: some View {
+        Section {
+            Button(L("Pair with the watch first", "Önce saatle eşleş")) { tab = .watch }
+                .fontWeight(.semibold)
+        } footer: {
+            Text(L("This needs an encrypted connection to the watch. Connect and pair on the Watch tab.",
+                   "Bunun için saatle şifreli bağlantı gerekiyor. Saat sekmesinden bağlan ve eşleş."))
         }
     }
 

@@ -321,7 +321,7 @@ struct WatchSpeakerSection: View {
         Section {
             switch speaker.state {
             case .idle:
-                Button(speaker.buttonTitle ?? L("Ring the watch and listen on its speaker", "Saati arat, hoparlöründen dinle")) { speaker.ring() }
+                Button(speaker.buttonTitle ?? L("Play the phone's audio on the watch", "Telefonun sesini saate yansıt")) { speaker.ring() }
                     .fontWeight(.semibold)
             case .ringing:
                 Label(L("The watch is ringing: answer it on the watch", "Saat çalıyor: saatten aç"), systemImage: "phone.arrow.down.left")

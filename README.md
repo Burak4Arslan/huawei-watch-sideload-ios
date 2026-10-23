@@ -117,7 +117,7 @@ it. After you swipe it away, open it once (after restarting the iPhone too, to b
 The watch is no Bluetooth music receiver, but it has a speaker for calls, and it opens that speaker for an answered
 incoming call. HuaSideload rings the watch with such a call:
 
-1. **Watch speaker → Ring the watch and listen on its speaker.** The watch rings like a call ("HuaSideload").
+1. **Features → Watch speaker → Play the phone's audio on the watch.** The watch rings like a call ("HuaSideload").
 2. Answer it on the watch.
 3. Play something in any app on the iPhone: Spotify, Apple Music, YouTube, a podcast. It comes out of the watch speaker.
 4. Hang up on the watch (or **End** in the app) to stop.

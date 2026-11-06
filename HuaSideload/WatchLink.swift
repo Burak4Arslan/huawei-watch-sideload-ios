@@ -27,7 +27,9 @@ final class WatchLink: NSObject, ObservableObject {
     @Published private(set) var isConnecting = false
     @Published private(set) var connectedName: String?
     @Published private(set) var huaweiChannelReady = false
+    // isPaired: the connection is encrypted, so commands work. pairingStage says whether pairing is really finished.
     @Published private(set) var isPaired = false
+    @Published private(set) var pairingStage: PairingStage = .none
     @Published private(set) var busy: String?
     @Published private(set) var battery: Int?
     @Published private(set) var watchInfo: [String] = []
@@ -41,6 +43,15 @@ final class WatchLink: NSObject, ObservableObject {
     @Published private(set) var musicStorage: MusicControl.Storage?
     @Published private(set) var musicUploadStatus: String?
     @Published private(set) var watchFaceStatus: String?
+    @Published private(set) var watchFaceStage: WatchFaceInstallStage = .idle
+    @Published private(set) var watchFaceCompatibility: WatchFaceCompatibility?
+    // The watch's watch face screen and engine (0x27/0x01), asked once per connection
+    @Published private(set) var watchFaceParams: WatchFaceService.DeviceParams?
+    // The connected watch is also held by another app on this iPhone (usually Huawei Health)
+    @Published private(set) var sharedWithOtherApp = false
+    private var faceConfirms: [String: WatchFaceService.ConfirmReport] = [:]
+    // The latest WatchfaceConfirm, whatever name the watch used for the face
+    private var lastFaceConfirm: WatchFaceService.ConfirmReport?
     // The watch asks for song info by file name: file name -> (title, artist)
     private var musicMetadata: [String: (title: String, artist: String)] = [:]
     private var lastInstallStatus: Int?
@@ -62,6 +73,12 @@ final class WatchLink: NSObject, ObservableObject {
     // Reconnect and pair again automatically when the connection drops
     private var wantsConnection = false
     private static let lastWatchKey = "lastWatch"
+
+    // Optional: the Huawei account ID the watch was set up with (Watch tab), kept in the Keychain. Sent in the setup
+    // after HiChain; without it the watch is told "no account", as Gadgetbridge does.
+    static var huaweiAccountId: String {
+        PairingSetup.normalizedAccountId(CredentialStore.shared.string(CredentialStore.huaweiAccountKey) ?? "") ?? ""
+    }
 
     override init() {
         features = WatchFeatures.load()
@@ -88,6 +105,8 @@ final class WatchLink: NSObject, ObservableObject {
                               MusicControl.uploadInfoReply(index: index, title: meta.title, artist: meta.artist))
             self.append(.info, L("The watch asked for song info: \(fileName) → \(meta.title)", "Saat şarkı bilgisini sordu: \(fileName) → \(meta.title)"))
         }
+        session.onPairingStage = { [weak self] stage in self?.pairingStage = stage }
+        session.onWatchFaceConfirm = { [weak self] report in self?.watchFaceConfirmed(report) }
         session.onAppInstallStatus = { [weak self] status, package in
             let kind: LogKind = status == 102 ? .success : (status == 103 || status == 106 ? .error : .info)
             self?.append(kind, "⌚ Saat: \(WatchApps.describeStatus(status)) \(package)")
@@ -217,6 +236,13 @@ final class WatchLink: NSObject, ObservableObject {
         wantsConnection = true
         UserDefaults.standard.set(device.id.uuidString, forKey: Self.lastWatchKey)
         append(.info, L("Connecting to \(device.name)…", "\(device.name) cihazına bağlanılıyor…"))
+        // iOS shares one Bluetooth link per device between apps: if Huawei Health is connected too, both would talk
+        // to the watch at the same time over the same channel
+        sharedWithOtherApp = device.systemConnected
+        if device.systemConnected {
+            append(.error, L("Another app on this iPhone (usually Huawei Health) is connected to this watch. Force-quit Huawei Health before pairing or installing; do not use both at the same time.",
+                             "Bu iPhone'daki başka bir uygulama (genelde Huawei Health) bu saate bağlı. Eşleşmeden veya yüklemeden önce Huawei Health'i tamamen kapat; ikisini aynı anda kullanma."))
+        }
         central.connect(device.peripheral)
 
         Task { [weak self] in
@@ -229,11 +255,20 @@ final class WatchLink: NSObject, ObservableObject {
         }
     }
 
+    // Also "release the watch for Huawei Health": stops scanning and notifications, closes this app's connection and
+    // does not reconnect on the next launch. The saved pairing key stays (Forget pairing is a separate action), and
+    // nothing is sent to the watch, so its pairing with Huawei Health is not touched.
     func disconnect() {
         wantsConnection = false
+        stopScan()
         // Disconnecting by hand means "start clean": don't reconnect on the next launch until a watch is picked again
         UserDefaults.standard.removeObject(forKey: Self.lastWatchKey)
         guard let peripheral else { return }
+        for service in peripheral.services ?? [] where service.uuid == huaweiService {
+            for c in service.characteristics ?? [] where c.uuid == notifyUUID && c.isNotifying {
+                peripheral.setNotifyValue(false, for: c)
+            }
+        }
         central.cancelPeripheralConnection(peripheral)
         if isConnecting {
             isConnecting = false
@@ -274,6 +309,10 @@ final class WatchLink: NSObject, ObservableObject {
         writeCharacteristic = nil
         huaweiChannelReady = false
         isPaired = false
+        pairingStage = .none
+        watchFaceParams = nil
+        sharedWithOtherApp = false
+        faceConfirms.removeAll()
         connectedName = nil
         battery = nil
         watchInfo = []
@@ -287,8 +326,28 @@ final class WatchLink: NSObject, ObservableObject {
     func pair() {
         guard let watchKey else { return }
         run(L("Pairing…", "Eşleşiyor…")) { session in
-            try await session.pair(watch: watchKey)
+            do {
+                try await session.pair(watch: watchKey)
+            } catch {
+                self.pairingStage = .failed(String(String(describing: error).prefix(120)))
+                throw error
+            }
             self.isPaired = true
+
+            // Before anything else, like Gadgetbridge: the watch waits for these after HiChain (PairingSetup)
+            self.pairingStage = .finishingSetup
+            let setup = await session.completeSetup(watchName: self.connectedName ?? "", accountId: Self.huaweiAccountId)
+            if !setup.sent.isEmpty { self.append(.success, L("Setup sent: ", "Kurulum gönderildi: ") + setup.sent.joined(separator: ", ")) }
+            if !setup.skipped.isEmpty { self.append(.info, L("Not asked for by the watch: ", "Saatin istemediği: ") + setup.skipped.joined(separator: ", ")) }
+            if setup.failed.isEmpty {
+                self.pairingStage = .paired
+                self.append(.success, L("PAIRED: HiChain finished and the watch accepted the setup. Check that the watch shows no error.",
+                                        "EŞLEŞTİ: HiChain bitti ve saat kurulumu kabul etti. Saatte hata çıkmadığını kontrol et."))
+            } else {
+                let why = setup.failed.joined(separator: ", ")
+                self.pairingStage = .setupIncomplete(why)
+                self.append(.error, L("Setup not accepted by the watch: ", "Saat kurulumu kabul etmedi: ") + why)
+            }
             self.watchUDID = session.watchUDID
             if let udid = session.watchUDID { self.addSecret(udid) }
             let environment = ProcessInfo.processInfo.environment
@@ -379,6 +438,7 @@ final class WatchLink: NSObject, ObservableObject {
         guard let watchKey else { return }
         session.forget(watch: watchKey)
         isPaired = false
+        pairingStage = huaweiChannelReady ? .channelReady : .none
         append(.info, L("Saved pairing removed. The next pairing starts from the PIN step.", "Kayıtlı eşleşme silindi. Tekrar eşleşince PIN adımından başlanacak."))
         objectWillChange.send()
     }
@@ -587,12 +647,12 @@ final class WatchLink: NSObject, ObservableObject {
         }
     }
 
-    // Uploads a watch face package (.hwt from Huawei Theme Studio). The watch adds it to its watch face list;
-    // pick it on the watch by touching and holding the current watch face.
+    // Uploads a watch face package (.hwt from Huawei Theme Studio), then follows it until the watch lists it
+    // (WatchFaceService). Stages: checked → transferred → confirmed by the watch → installed (listed) → active.
     func installWatchFace(_ url: URL, title displayTitle: String? = nil) {
         guard busy == nil else { return }
-        watchAppProgress = 0
-        watchFaceStatus = L("Preparing the watch face…", "Kadran hazırlanıyor…")
+        watchAppProgress = nil
+        setFaceStage(.validating)
         run(L("Installing the watch face…", "Kadran saate yükleniyor…")) { session in
             defer { self.watchAppProgress = nil }
             do {
@@ -600,21 +660,113 @@ final class WatchLink: NSObject, ObservableObject {
                 defer { if accessing { url.stopAccessingSecurityScopedResource() } }
                 let face = try WatchFacePackage(hwt: Data(contentsOf: url))
                 let title = displayTitle ?? face.title
-                self.append(.info, L("Watch face: \(title), screen \(face.screen), version \(face.version), \(face.bin.count / 1024) KB",
-                                     "Kadran: \(title), ekran \(face.screen), sürüm \(face.version), \(face.bin.count / 1024) KB"))
-                self.watchFaceStatus = L("Sending \(title) (\(face.bin.count / 1024) KB)…", "\(title) gönderiliyor (\(face.bin.count / 1024) KB)…")
-                // Like Gadgetbridge: a random numeric name with a version suffix
-                let name = String(format: "%09d_1.0.0", Int.random(in: 0..<1_000_000_000))
-                try await session.uploadFile(face.bin, name: name, type: FileUpload.FileType.watchface) { fraction in
-                    self.watchAppProgress = fraction
+                self.append(.info, L("Watch face: \(title), screen \(face.screen), version \(face.version), \(face.bin.count / 1024) KB, files: \(face.files.count)",
+                                     "Kadran: \(title), ekran \(face.screen), sürüm \(face.version), \(face.bin.count / 1024) KB, dosya: \(face.files.count)"))
+                face.warnings.forEach { self.append(.info, L("Package: ", "Paket: ") + $0) }
+
+                if self.watchFaceParams == nil { self.watchFaceParams = try? await session.watchFaceParams() }
+                let compatibility = WatchFaceCompatibility.evaluate(screenCode: face.screen, device: self.watchFaceParams)
+                self.watchFaceCompatibility = compatibility
+                self.append(compatibility.blocksInstall ? .error : .info, compatibility.label)
+                guard !compatibility.blocksInstall else {
+                    self.setFaceStage(.failed(compatibility.label))
+                    return
                 }
-                let done = L("Watch face sent. On the watch, touch and hold the watch face and pick \(title).",
-                             "Kadran gönderildi. Saatte kadrana basılı tut ve listeden \(title) kadranını seç.")
-                self.watchFaceStatus = done
-                self.append(.success, done)
+
+                // The list before the upload, to recognise the new face even if the watch lists it under another name
+                let before = try? await session.installedWatchFaces()
+                self.append(.info, L("Watch faces before the upload: ", "Yüklemeden önceki kadranlar: ") + WatchFaceInstallCheck.describe(before))
+
+                // A random numeric name with a version suffix (Gadgetbridge: always 1.0.0); what is sent and the
+                // version depend on the chosen upload method
+                let method = WatchFaceUploadMethod.current
+                let name = method.uploadName(number: Int.random(in: 0..<1_000_000_000), faceVersion: face.version)
+                let payload = method.payload(bin: face.bin, package: face.package)
+                let engine = self.watchFaceParams.map { L(", watch engine \($0.maxVersion.isEmpty ? "?" : $0.maxVersion)", ", saat motoru \($0.maxVersion.isEmpty ? "?" : $0.maxVersion)") } ?? ""
+                self.append(.info, L("Upload method \(method.label): \(payload.count) bytes as \(name) (face version \(face.version)\(engine), watchface.bin \(face.binWasZipped ? "inside a zip" : "is the file itself"))",
+                                     "Yükleme yöntemi \(method.label): \(payload.count) bayt, ad \(name) (kadran sürümü \(face.version)\(engine), watchface.bin \(face.binWasZipped ? "zip içinde" : "dosyanın kendisi"))"))
+                let faceName = WatchFaceService.split(name).name
+                self.faceConfirms[faceName] = nil
+                self.lastFaceConfirm = nil
+                self.setFaceStage(.transferring(0))
+                try await session.uploadFile(payload, name: name, type: FileUpload.FileType.watchface) { fraction in
+                    self.watchAppProgress = fraction
+                    self.setFaceStage(.transferring(fraction))
+                }
+                self.watchAppProgress = nil
+                self.setFaceStage(.transferred)
+                self.append(.success, L("Transfer finished (the watch accepted the file as \(faceName)). Waiting for it to confirm and list the face…",
+                                        "Aktarım bitti (saat dosyayı \(faceName) olarak aldı). Saatin kadranı onaylayıp listelemesi bekleniyor…"))
+
+                // The watch sends WatchfaceConfirm (0x27/0x05) once it has stored the face; HuaweiSession answers it at
+                // any time. Gadgetbridge has no deadline for it, and storing a face can take a while, so the list is
+                // checked every few seconds for up to 90 s instead of once after 20 s.
+                let started = Date()
+                var after: [WatchFaceService.Installed] = []
+                var listChecks = 0
+                var outcome = WatchFaceInstallCheck.Outcome.notFound
+                var nextListCheck = started.addingTimeInterval(4)
+                while Date().timeIntervalSince(started) < 90 {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    let confirm = self.faceConfirms[faceName] ?? self.lastFaceConfirm
+                    if confirm != nil, self.watchFaceStage == .transferred { self.setFaceStage(.confirmedByWatch) }
+                    guard Date() >= nextListCheck || (confirm != nil && listChecks == 0) else { continue }
+                    nextListCheck = Date().addingTimeInterval(6)
+                    listChecks += 1
+                    guard let list = try? await session.installedWatchFaces() else { continue }
+                    after = list
+                    outcome = WatchFaceInstallCheck.evaluate(uploadName: faceName, before: before, after: list, confirm: confirm)
+                    if case .listed = outcome { break }
+                }
+                session.stopTrace()
+                let confirm = self.faceConfirms[faceName] ?? self.lastFaceConfirm
+                let waited = Int(Date().timeIntervalSince(started))
+                self.append(.info, L("Watch faces after the upload: ", "Yüklemeden sonraki kadranlar: ") + WatchFaceInstallCheck.describe(after)
+                            + L(" (\(listChecks) checks in \(waited) s)", " (\(waited) sn içinde \(listChecks) kontrol)"))
+                if let confirm, confirm.name != faceName {
+                    self.append(.info, L("The watch confirmed the face as \(confirm.fileName), not \(name)", "Saat kadranı \(name) değil \(confirm.fileName) olarak onayladı"))
+                }
+
+                switch outcome {
+                case .listed(let listed, let match):
+                    if match != .uploadName {
+                        self.append(.info, L("Found as \(listed.name) (", "\(listed.name) olarak bulundu (")
+                                    + (match == .confirmedName ? L("the confirmed name)", "onaylanan ad)") : L("the one new face in the list)", "listedeki tek yeni kadran)")))
+                    }
+                    self.setFaceStage(listed.isCurrent ? .active : .installed)
+                    self.append(.success, self.watchFaceStage.label)
+                case .confirmedOnly:
+                    self.append(.info, L("The watch confirmed the face but did not list it within \(waited) s. Check the watch face list on the watch.",
+                                         "Saat kadranı onayladı ama \(waited) sn içinde listelemedi. Saatteki kadran listesine bak."))
+                case .notFound:
+                    // Where it stopped: the last thing the watch did, for the report
+                    let status = session.lastUploadResultStatus.map { L(", status \($0)", ", durum \($0)") } ?? ""
+                    self.setFaceStage(.failed(L("the watch took the whole file (0x28/0x07\(status), acknowledged) but sent no confirmation (0x27/0x05) and did not list the face within \(waited) s",
+                                                "saat dosyanın tamamını aldı (0x28/0x07\(status), onaylandı) ama \(waited) sn içinde onay (0x27/0x05) göndermedi ve kadranı listelemedi")))
+                    self.append(.error, self.watchFaceStage.label)
+                }
             } catch {
-                self.watchFaceStatus = L("Error: ", "Hata: ") + "\(error)"
+                self.setFaceStage(.failed("\(error)"))
                 throw error
+            }
+        }
+    }
+
+    private func setFaceStage(_ stage: WatchFaceInstallStage) {
+        watchFaceStage = stage
+        watchFaceStatus = stage == .idle ? nil : stage.label
+    }
+
+    // A WatchfaceConfirm from the watch (already answered by the session). Report type 2: make the face active,
+    // as Gadgetbridge does.
+    private func watchFaceConfirmed(_ report: WatchFaceService.ConfirmReport) {
+        faceConfirms[report.name] = report
+        lastFaceConfirm = report
+        guard report.reportType == 2 else { return }
+        Task {
+            let code = try? await session.activateWatchFace(fileName: report.fileName)
+            if let code, code != HuaweiPacket.resultSuccess {
+                append(.error, String(format: L("The watch did not make the face active (0x%X)", "Saat kadranı etkinleştirmedi (0x%X)"), code))
             }
         }
     }
@@ -641,6 +793,14 @@ final class WatchLink: NSObject, ObservableObject {
         report(MusicControl.serviceId, L("Music control", "Müzik kontrolü"))
         report(0x2A, L("App install", "Uygulama kurma"))
         report(0x27, L("Watch faces", "Kadran kurma"))
+        if services.contains(WatchFaceService.serviceId), let params = try? await session.watchFaceParams() {
+            watchFaceParams = params
+            let code = WatchFaceScreen.resolutions.first { $0.value == params.resolution }?.key ?? "?"
+            let line = L("Watch face screen: \(params.resolution) (\(code)), engine \(params.maxVersion)",
+                         "Kadran ekranı: \(params.resolution) (\(code)), motor \(params.maxVersion)")
+            watchInfo.append(line)
+            append(.info, line)
+        }
     }
 
     private func run(_ label: String, _ work: @escaping (HuaweiSession) async throws -> Void) {
@@ -822,7 +982,9 @@ extension WatchLink: @preconcurrency CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         isConnecting = false
+        let wasPairing = ![PairingStage.none, .channelReady].contains(pairingStage)
         resetConnectionState()
+        if wasPairing { pairingStage = .connectionLost }
         if let error {
             append(.error, L("Connection lost: ", "Bağlantı koptu: ") + error.localizedDescription)
         } else {
@@ -883,8 +1045,12 @@ extension WatchLink: @preconcurrency CBPeripheralDelegate {
         }
         huaweiChannelReady = characteristic.isNotifying && writeCharacteristic != nil
         if huaweiChannelReady {
+            pairingStage = .channelReady
             append(.success, L("Huawei channel ready. BLE write limit: \(maxWriteLength) bytes", "Huawei kanalı hazır. BLE yazma sınırı: \(maxWriteLength) bayt"))
-            if hasSavedPairing {
+            if hasSavedPairing && sharedWithOtherApp {
+                append(.info, L("Saved pairing found, but another app is connected to the watch: not pairing automatically. Close Huawei Health, then tap Pair.",
+                                "Kayıtlı eşleşme var ama saate başka bir uygulama bağlı: otomatik eşleşilmiyor. Huawei Health'i kapat, sonra Eşleş'e dokun."))
+            } else if hasSavedPairing {
                 append(.info, L("Saved pairing found, pairing automatically…", "Kayıtlı eşleşme var, otomatik eşleşiliyor…"))
                 pair()
             } else {

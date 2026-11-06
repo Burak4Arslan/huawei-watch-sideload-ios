@@ -28,12 +28,13 @@ struct WatchStore {
         return Array(id.utf8)
     }
 
+    // Pairing keys are in the Keychain (CredentialStore), moved there from UserDefaults by older builds on first read
     func authToken(for watch: String) -> [UInt8]? {
-        defaults.string(forKey: "authToken." + watch).flatMap { [UInt8](hex: $0) }
+        CredentialStore.shared.string(CredentialStore.authTokenKey(watch)).flatMap { [UInt8](hex: $0) }
     }
 
     func setAuthToken(_ token: [UInt8]?, for watch: String) {
-        defaults.set(token?.hexCompact, forKey: "authToken." + watch)
+        CredentialStore.shared.set(token?.hexCompact, for: CredentialStore.authTokenKey(watch))
     }
 }
 
@@ -66,12 +67,34 @@ final class HuaweiSession {
     }
     private var upload: Upload?
 
+    // Post-upload trace (UploadTrace): from the last chunk on, every packet in and out is logged as service/command
+    // and tag lengths, plus unhandled packets, so the log shows where the watch stops after a transfer
+    private var traceUntil: Date?
+    private var tracing: Bool { traceUntil.map { Date() < $0 } ?? false }
+
+    func traceTraffic(for seconds: Double) {
+        traceUntil = Date().addingTimeInterval(seconds)
+    }
+
+    func stopTrace() {
+        traceUntil = nil
+    }
+
+    // The watch's 0x28/0x07 for the last upload: tag 0x02 (status) if it sent one
+    private(set) var lastUploadResultStatus: Int?
+
     // P2P: replies are matched by sequence number (HuaweiBaseP2PService.waitPackets)
     private var p2pSequence: UInt16 = 1
     private var p2pWaiters: [UInt16: CheckedContinuation<P2P.Message, Error>] = [:]
 
     // The watch reports progress while installing an uploaded app (percent, 102 installed, 103 failed)
     var onAppInstallStatus: ((Int, String) -> Void)?
+
+    // Pairing progress for the Watch tab (PairingStage); pair() reports up to .authenticated
+    var onPairingStage: ((PairingStage) -> Void)?
+
+    // The watch confirmed an uploaded watch face (0x27/0x05); the session has already answered it
+    var onWatchFaceConfirm: ((WatchFaceService.ConfirmReport) -> Void)?
 
     // P2P data from apps on the watch (source package, data)
     var onAppMessage: ((String, [UInt8]) -> Void)?
@@ -122,6 +145,7 @@ final class HuaweiSession {
     // Decrypts if needed and hands the packet to the waiting request. Returns the (decrypted) packet for logging.
     func receive(_ packet: HuaweiPacket) -> HuaweiPacket {
         var packet = packet
+        logDiagnostics(packet)
         if packet.isEncrypted {
             if let tlv = packet.tlv, let key = sessionKey, let link,
                let iv = tlv.value(0x7D), let cipher = tlv.value(0x7E) {
@@ -136,7 +160,12 @@ final class HuaweiSession {
             }
         }
 
-        if let i = waiters.firstIndex(where: { $0.serviceId == packet.serviceId && $0.commandId == packet.commandId }) {
+        let waiterIndex = waiters.firstIndex(where: { $0.serviceId == packet.serviceId && $0.commandId == packet.commandId })
+        if tracing {
+            log(.info, UploadTrace.line("in", service: packet.serviceId, command: packet.commandId, tlv: packet.tlv, bodySize: packet.body.count)
+                + (waiterIndex != nil ? L(" -> answer to our request", " -> isteğimize yanıt") : L(" -> sent by the watch", " -> saatin kendi mesajı")))
+        }
+        if let i = waiterIndex {
             waiters.remove(at: i).continuation.resume(returning: packet)
         } else {
             handleUnsolicited(packet)
@@ -166,6 +195,15 @@ final class HuaweiSession {
             onAppInstallStatus?(status, package)
             return
         }
+        // The watch stored an uploaded watch face and asks for confirmation (AsynchronousResponse.handleWatchface)
+        if isPaired, packet.serviceId == WatchFaceService.serviceId, packet.commandId == WatchFaceService.confirmCommand,
+           let tlv = packet.tlv, let report = WatchFaceService.parseConfirm(tlv) {
+            send(WatchFaceService.serviceId, WatchFaceService.confirmCommand, WatchFaceService.confirmReply(fileName: report.fileName))
+            log(.info, L("The watch confirmed watch face \(report.fileName) (report type \(report.reportType)); confirmation sent",
+                         "Saat \(report.fileName) kadranını onayladı (bildirim türü \(report.reportType)); onay gönderildi"))
+            onWatchFaceConfirm?(report)
+            return
+        }
         guard isPaired, packet.serviceId == MusicControl.serviceId, let tlv = packet.tlv else {
             logUnhandled(packet)
             return
@@ -193,7 +231,7 @@ final class HuaweiSession {
     // Diagnostics, off by default: log unsolicited packets that nothing handles, e.g. to find out whether a button on
     // the watch sends anything. A feature turns it on with the UserDefaults key "HuaSideloadLogUnhandledPackets".
     private func logUnhandled(_ packet: HuaweiPacket) {
-        guard UserDefaults.standard.bool(forKey: "HuaSideloadLogUnhandledPackets") else { return }
+        guard tracing || UserDefaults.standard.bool(forKey: "HuaSideloadLogUnhandledPackets") else { return }
         let tags = packet.tlv?.items.map { item in
             String(format: "%02X=", item.tag) + (item.value.count <= 8 ? item.value.map { String(format: "%02X", $0) }.joined() : "\(item.value.count)B")
         }.joined(separator: " ") ?? "\(packet.body.count)B"
@@ -201,10 +239,32 @@ final class HuaweiSession {
                           packet.serviceId, packet.commandId) + " [\(tags)]")
     }
 
+    // Pairing diagnostics, off by default (Log tab toggle, UserDefaults key "HuaSideloadPairingDiagnostics"): header,
+    // TLV tags with lengths only, and the session state. Never logs values, so no keys, IVs, PIN, UDID or MAC.
+    nonisolated static let diagnosticsKey = "HuaSideloadPairingDiagnostics"
+    private var diagnostics: Bool { UserDefaults.standard.bool(forKey: Self.diagnosticsKey) }
+
+    private func logDiagnostics(_ packet: HuaweiPacket) {
+        guard diagnostics else { return }
+        let tags = packet.tlv?.items.map { String(format: "%02X:%d", $0.tag, $0.value.count) }.joined(separator: " ") ?? "not TLV"
+        let waiting = waiters.map { String(format: "0x%02X/0x%02X", $0.serviceId, $0.commandId) }.joined(separator: ", ")
+        var line = String(format: "Diag in: service 0x%02X, command 0x%02X", packet.serviceId, packet.commandId)
+        line += ", body \(packet.body.count) B, tags [\(tags)], encrypted \(packet.isEncrypted ? "yes" : "no")"
+        line += ", session key \(sessionKey == nil ? "no" : "yes"), paired \(isPaired ? "yes" : "no")"
+        line += ", waiting for [\(waiting.isEmpty ? "-" : waiting)], last request: \(lastRequest)"
+        if packet.isEncrypted && sessionKey == nil {
+            line += " -> not decrypted: no session key on this connection yet"
+        }
+        log(.info, line)
+    }
+
+    private var lastRequest = "-"
+
     // MARK: - Sending
 
     // Fire and forget (acknowledgements and updates)
     func send(_ serviceId: UInt8, _ commandId: UInt8, _ tlv: HuaweiTLV, encrypted: Bool = true) {
+        if tracing { log(.info, UploadTrace.line("out", service: serviceId, command: commandId, tlv: tlv, bodySize: 0)) }
         do {
             try frames(serviceId, commandId, tlv, encrypted: encrypted, sliced: false).forEach(writeFrame)
         } catch {
@@ -215,6 +275,8 @@ final class HuaweiSession {
     func request(_ serviceId: UInt8, _ commandId: UInt8, _ tlv: HuaweiTLV, label: String,
                  encrypted: Bool = true, sliced: Bool = false, timeout: Double = 10, quiet: Bool = false) async throws -> HuaweiPacket {
         let frames = try frames(serviceId, commandId, tlv, encrypted: encrypted, sliced: sliced)
+        lastRequest = String(format: "0x%02X/0x%02X ", serviceId, commandId) + label
+        if tracing { log(.info, UploadTrace.line("out", service: serviceId, command: commandId, tlv: tlv, bodySize: 0) + " (\(label))") }
         if !quiet {
             let size = frames.reduce(0) { $0 + $1.count }
             let encryptedNote = encrypted ? L(" (encrypted)", " (şifreli)") : ""
@@ -260,6 +322,7 @@ final class HuaweiSession {
     func pair(watch: String) async throws {
         isPaired = false
         sessionKey = nil
+        onPairingStage?(.negotiating)
 
         let linkResponse = try await request(LinkParams.serviceId, LinkParams.commandId,
                                              HuaweiTLV().with(0x01).with(0x02).with(0x03).with(0x04),
@@ -268,6 +331,10 @@ final class HuaweiSession {
         let link = LinkInfo(linkTLV)
         self.link = link
         log(.info, "Auth \(link.authVersion), support type \(link.deviceSupportType), \(link.usesGCM ? "AES-GCM" : "AES-CBC")")
+        if diagnostics {
+            log(.info, "Diag link: protocol \(link.protocolVersion), slice \(link.sliceSize), mtu \(link.mtu), auth version \(link.authVersion), "
+                + "support type \(link.deviceSupportType), auth algo \(link.authAlgo), bond state \(link.bondState), encrypt method \(link.encryptMethod)")
+        }
 
         guard [1, 2, 3, 4].contains(link.deviceSupportType) else {
             throw HuaweiSessionError.unsupported(L("pairing without HiChain (support type \(link.deviceSupportType))",
@@ -300,18 +367,27 @@ final class HuaweiSession {
             let pin = try PinCode.decrypt(pinTLV, link: link)
             log(.success, L("PIN decrypted (\(pin.count) bytes)", "PIN çözüldü (\(pin.count) bayt)"))
             log(.info, L("⌚ If the watch asks for confirmation, ACCEPT it (60 s)", "⌚ Saatin ekranında onay çıkarsa ONAYLA (60 sn)"))
+            onPairingStage?(.pinProcessed)
 
+            onPairingStage?(.hiChain)
             let token = try await hiChain(operation: 1, key: HCrypto.sha256(Array(pin.hexCompact.utf8)), deviceId: deviceId)
-            store.setAuthToken(token, for: watch)
             authToken = token
-            log(.success, L("Permanent pairing key received and saved", "Kalıcı eşleşme anahtarı alındı ve kaydedildi"))
+            log(.success, L("Permanent pairing key received", "Kalıcı eşleşme anahtarı alındı"))
         } else {
             log(.info, L("3/4 Saved pairing key found, PIN step skipped", "3/4 Kayıtlı eşleşme anahtarı var, PIN adımı atlandı"))
+            onPairingStage?(.hiChain)
         }
 
         sessionKey = try await hiChain(operation: 2, key: authToken!, deviceId: deviceId)
+        // Saved only now: a key from a handshake that did not finish would make every reconnect fail
+        if store.authToken(for: watch) == nil {
+            store.setAuthToken(authToken, for: watch)
+            log(.success, L("Pairing key saved", "Eşleşme anahtarı kaydedildi"))
+        }
         isPaired = true
-        log(.success, L("PAIRED! The connection to the watch is now encrypted.", "EŞLEŞME TAMAM! Artık saatle şifreli konuşuyoruz."))
+        onPairingStage?(.authenticated)
+        log(.success, L("HiChain finished: the connection to the watch is encrypted. Finishing setup…",
+                        "HiChain bitti: saatle bağlantı şifreli. Kurulum tamamlanıyor…"))
     }
 
     // GetHiChainRequest: op 1 returns the permanent key (authToken), op 2 the session key
@@ -374,7 +450,9 @@ final class HuaweiSession {
     private func hiChainStep(_ tlv: HuaweiTLV, label: String, timeout: Double = 10) async throws -> HiChainMessage.Response {
         let response = try await request(0x01, HiChainMessage.commandId, tlv, label: label, encrypted: false, sliced: true, timeout: timeout)
         guard let responseTLV = response.tlv else { throw HuaweiAuthError.unexpected("\(label): no TLV") }
-        return try HiChainMessage.parseResponse(responseTLV)
+        return try HiChainMessage.parseResponse(responseTLV) { summary, adjusted in
+            if adjusted || diagnostics { log(.info, "HiChain reply (\(label)): \(summary)") }
+        }
     }
 
     // MARK: - Commands after pairing
@@ -442,6 +520,105 @@ final class HuaweiSession {
         return response.tlv?.value(0x01) ?? []
     }
 
+    // MARK: - Watch faces (WatchFaceService, service 0x27)
+
+    func watchFaceParams() async throws -> WatchFaceService.DeviceParams? {
+        let response = try await request(WatchFaceService.serviceId, WatchFaceService.paramsCommand, WatchFaceService.paramsRequest(),
+                                         label: L("Watch face parameters", "Kadran parametreleri"), timeout: 6)
+        return response.tlv.flatMap(WatchFaceService.parseParams)
+    }
+
+    func installedWatchFaces() async throws -> [WatchFaceService.Installed] {
+        let response = try await request(WatchFaceService.serviceId, WatchFaceService.listCommand, WatchFaceService.listRequest(),
+                                         label: L("Watch faces on the watch", "Saatteki kadranlar"), timeout: 8)
+        return response.tlv.map(WatchFaceService.parseList) ?? []
+    }
+
+    // Returns the watch's result code, nil when it sent none
+    func activateWatchFace(fileName: String) async throws -> Int? {
+        let response = try await request(WatchFaceService.serviceId, WatchFaceService.operationCommand,
+                                         WatchFaceService.operation(fileName: fileName, WatchFaceService.activate),
+                                         label: L("Make the watch face active", "Kadranı etkinleştir"), timeout: 8)
+        return response.resultCode
+    }
+
+    // MARK: - Setup after HiChain (PairingSetup)
+
+    struct SetupResult {
+        var sent: [String] = []
+        var skipped: [String] = []
+        var failed: [String] = []
+    }
+
+    // Runs after every successful HiChain, like Gadgetbridge. A step the watch rejects or does not answer is reported
+    // and the others still go out (Gadgetbridge also moves on after a timeout). The account ID is never logged.
+    func completeSetup(watchName: String, accountId: String) async -> SetupResult {
+        var result = SetupResult()
+        func record(_ name: String, _ outcome: Result<HuaweiPacket, Error>) {
+            switch outcome {
+            case .success(let response):
+                if let code = response.resultCode, code != HuaweiPacket.resultSuccess {
+                    result.failed.append(String(format: "%@ (0x%X)", name, code))
+                } else {
+                    result.sent.append(name)
+                }
+            case .failure(let error):
+                result.failed.append("\(name) (\(error))")
+            }
+        }
+        func send(_ name: String, _ service: UInt8, _ command: UInt8, _ tlv: HuaweiTLV) async -> Result<HuaweiPacket, Error> {
+            do {
+                return .success(try await request(service, command, tlv, label: name, timeout: 6))
+            } catch {
+                return .failure(error)
+            }
+        }
+
+        let timeName = L("Set time", "Saati ayarla")
+        record(timeName, await send(timeName, PairingSetup.deviceConfig, PairingSetup.timeCommand,
+                                    PairingSetup.time(Date(), timeZone: .current)))
+
+        var support = PairingSetup.Support()
+        do {
+            support.commands = try await supportedCommands(PairingSetup.commandQuery)
+        } catch {
+            result.failed.append(L("Supported commands", "Desteklenen komutlar") + " (\(error))")
+        }
+        if support.asksExpandCapabilities {
+            support.expandCapabilities = (try? await expandCapabilities()) ?? []
+        }
+        if diagnostics {
+            log(.info, "Diag setup: account \(support.sendsAccount ? "yes" : "no"), agreements \(support.sendsAgreements ? "yes" : "no"), "
+                + "setup status \(support.sendsSetUpStatus ? "yes" : "no"), diff-account pairing \(support.diffAccountPairing ? "yes" : "no"), "
+                + "account ID given \(accountId.isEmpty ? "no" : "yes")")
+        }
+
+        let accountName = L("Huawei account", "Huawei hesabı")
+        if support.sendsAccount {
+            record(accountName, await send(accountName, PairingSetup.accountService, PairingSetup.extendedAccountCommand,
+                                           PairingSetup.extendedAccount(accountId, diffAccountPairing: support.diffAccountPairing)))
+        } else {
+            result.skipped.append(accountName)
+        }
+
+        let agreementsName = L("Agreements", "Sözleşmeler")
+        if support.sendsAgreements {
+            record(agreementsName, await send(agreementsName, PairingSetup.deviceConfig, PairingSetup.acceptAgreementCommand,
+                                              PairingSetup.acceptAgreements(Date())))
+        } else {
+            result.skipped.append(agreementsName)
+        }
+
+        let statusName = L("Setup status", "Kurulum durumu")
+        if support.sendsSetUpStatus {
+            record(statusName, await send(statusName, PairingSetup.deviceConfig, PairingSetup.setUpDeviceStatusCommand,
+                                          PairingSetup.setUpDeviceStatus(watchName: watchName)))
+        } else {
+            result.skipped.append(statusName)
+        }
+        return result
+    }
+
     func musicStorage() async throws -> MusicControl.Storage {
         let response = try await request(MusicControl.serviceId, MusicControl.storageCommand,
                                          HuaweiTLV().with(0x01).with(0x02).with(0x03).with(0x04).with(0x05),
@@ -481,6 +658,7 @@ final class HuaweiSession {
         guard upload == nil else { throw HuaweiAuthError.unexpected(L("another upload is running", "zaten bir yükleme sürüyor")) }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             upload = Upload(data: data, sha256: HCrypto.sha256(data), progress: progress, continuation: continuation)
+            lastUploadResultStatus = nil
             Task {
                 do {
                     let response = try await request(FileUpload.serviceId, FileUpload.Command.info,
@@ -557,13 +735,25 @@ final class HuaweiSession {
                 return
             }
             current.progress(Double(offset + slice.count) / Double(current.data.count))
+            if offset + slice.count >= current.data.count {
+                traceTraffic(for: 150)
+                log(.info, L("Last chunk sent: offset \(offset), \(slice.count) bytes (file \(current.fileId), \(current.data.count) bytes in all). Tracing the watch's replies…",
+                             "Son parça gönderildi: konum \(offset), \(slice.count) bayt (dosya \(current.fileId), toplam \(current.data.count) bayt). Saatin yanıtları izleniyor…"))
+            }
         case FileUpload.Command.result:
+            // Gadgetbridge (FileUploadResult) answers 0x7F = success + file id and does not read the status; it is
+            // logged here so a rejection by the watch is visible
+            lastUploadResultStatus = tlv.int(0x02)
+            let status = lastUploadResultStatus.map(String.init) ?? L("none", "yok")
+            log(.info, L("Watch upload result 0x28/0x07: file \(tlv.value(0x01)?.first.map(String.init) ?? "?"), status \(status)",
+                         "Saatin yükleme sonucu 0x28/0x07: dosya \(tlv.value(0x01)?.first.map(String.init) ?? "?"), durum \(status)"))
             send(FileUpload.serviceId, FileUpload.Command.result, FileUpload.complete(fileId: current.fileId))
             current.progress(1)
-            log(.success, L("The watch received the whole file", "Saat dosyayı tamamen aldı"))
+            log(.success, L("The watch received the whole file; result acknowledged", "Saat dosyayı tamamen aldı; sonuç onaylandı"))
             finishUpload(nil)
         case FileUpload.Command.deviceError:
             let code = tlv.int(0x7F) ?? -1
+            log(.error, L("Watch upload error 0x28/0x08: code \(code)", "Saatin yükleme hatası 0x28/0x08: kod \(code)"))
             finishUpload(HuaweiAuthError.watchError(FileUpload.describe(error: code)))
         default:
             upload = current

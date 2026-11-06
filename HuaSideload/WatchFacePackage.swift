@@ -9,6 +9,25 @@ struct WatchFacePackage {
     let screen: String
     let version: String
     let bin: [UInt8]
+    let package: [UInt8]        // com.huawei.watchface as stored in the .hwt (WatchFaceUploadMethod)
+    // What the archive holds, for the pre-install check (sizes and names only)
+    let root: String            // HwTheme (Huawei) or HnTheme (Honor)
+    let files: [String]
+    let binWasZipped: Bool      // com.huawei.watchface was a zip holding watchface.bin (newer packages)
+    let hasPreview: Bool
+
+    // Problems that do not stop the upload but are worth showing
+    var warnings: [String] {
+        var list: [String] = []
+        if root != "HwTheme" && root != "HnTheme" {
+            list.append(L("description.xml has no HwTheme/HnTheme root", "description.xml'de HwTheme/HnTheme kökü yok"))
+        }
+        if screen == "?" { list.append(L("no <screen> in description.xml", "description.xml'de <screen> yok")) }
+        if version == "?" { list.append(L("no <version> in description.xml", "description.xml'de <version> yok")) }
+        if !hasPreview { list.append(L("no preview/cover.jpg", "preview/cover.jpg yok")) }
+        if bin.isEmpty { list.append(L("watchface.bin is empty", "watchface.bin boş")) }
+        return list
+    }
 
     enum PackageError: LocalizedError {
         case notZip
@@ -30,13 +49,19 @@ struct WatchFacePackage {
         title = Self.tag("title", in: text) ?? "?"
         screen = Self.tag("screen", in: text) ?? "?"
         version = Self.tag("version", in: text) ?? "?"
+        root = text.contains("<HnTheme") ? "HnTheme" : (text.contains("<HwTheme") ? "HwTheme" : "?")
+        files = outer.names
+        hasPreview = outer.names.contains("preview/cover.jpg")
         guard let inner = outer.file("com.huawei.watchface") ?? outer.file("com.honor.watchface") else {
             throw PackageError.missing("com.huawei.watchface")
         }
+        package = inner
         if let innerZip = try? ZipArchive(inner), let bin = innerZip.file("watchface.bin") {
             self.bin = bin
+            binWasZipped = true
         } else {
             self.bin = inner
+            binWasZipped = false
         }
     }
 
@@ -53,12 +78,17 @@ struct WatchFacePackage {
 enum WatchFaceCatalog {
     static let all: [URL] = (Bundle.main.urls(forResourcesWithExtension: "hwt", subdirectory: nil) ?? [])
         .sorted { $0.lastPathComponent.localizedCompare($1.lastPathComponent) == .orderedAscending }
+
+    // Screen code of each bundled face (description.xml), read once
+    static let screens: [URL: String] = Dictionary(uniqueKeysWithValues: all.compactMap { url in
+        (try? Data(contentsOf: url)).flatMap { try? WatchFacePackage(hwt: $0) }.map { (url, $0.screen) }
+    })
 }
 
 // Minimal zip reader: central directory, stored (0) and deflate (8) entries; no zip64.
 struct ZipArchive {
     private let bytes: [UInt8]
-    private var entries: [String: (method: Int, compressed: Int, size: Int, offset: Int)] = [:]
+    private var entries: [String: (method: Int, compressed: Int, size: Int, offset: Int, crc: UInt32)] = [:]
 
     init(_ bytes: [UInt8]) throws {
         self.bytes = bytes
@@ -76,6 +106,7 @@ struct ZipArchive {
         for _ in 0..<count {
             guard p + 46 <= bytes.count, Self.u32(bytes, p) == 0x0201_4B50 else { throw WatchFacePackage.PackageError.notZip }
             let method = Self.u16(bytes, p + 10)
+            let crc = UInt32(Self.u32(bytes, p + 16))
             let compressed = Self.u32(bytes, p + 20)
             let size = Self.u32(bytes, p + 24)
             let nameLength = Self.u16(bytes, p + 28)
@@ -84,9 +115,16 @@ struct ZipArchive {
             let local = Self.u32(bytes, p + 42)
             guard p + 46 + nameLength <= bytes.count else { throw WatchFacePackage.PackageError.notZip }
             let name = String(decoding: bytes[(p + 46)..<(p + 46 + nameLength)], as: UTF8.self)
-            entries[name] = (method, compressed, size, local)
+            entries[name] = (method, compressed, size, local, crc)
             p += 46 + nameLength + extraLength + commentLength
         }
+    }
+
+    var names: [String] { entries.keys.sorted() }
+
+    // The stored CRC-32 of an entry and its compression method (HWTAnalyzer checks every entry against it)
+    func info(_ name: String) -> (method: Int, crc: UInt32, size: Int)? {
+        entries[name].map { ($0.method, $0.crc, $0.size) }
     }
 
     func file(_ name: String) -> [UInt8]? {

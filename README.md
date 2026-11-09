@@ -81,12 +81,22 @@ likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a dif
 
 If the SDK or Node live elsewhere, set `OHOS_SDK=/path` or `NODE16=/path/to/node`.
 
-> If you only want the iPhone app (pairing, music upload, notifications) you don't need the Huawei account
-> or the OpenHarmony SDK; those are only for installing your own watch apps.
+> If you only want the iPhone app (pairing, music upload, notifications, watch faces) you don't need the Huawei
+> account or the OpenHarmony SDK; those are only for installing your own watch apps. You don't need a Mac either:
+> there is a prebuilt app (section 3).
 
 ---
 
 ## 3. Install the iPhone app and pair the watch
+
+**Without a Mac (prebuilt app):** download `HuaSideload-x.y.ipa` from
+[Releases](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/releases/latest) and install it with
+[Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using your own Apple ID. Then on the iPhone:
+Settings → General → VPN & Device Management → trust your Apple ID, and turn on Developer Mode if iOS asks. With a
+free Apple ID the app has to be reinstalled every 7 days. If your own watch apps will message the phone (4.4), build
+the app yourself instead: the sideloading tool may change the bundle ID.
+
+**Building it yourself (Mac + Xcode):**
 
 ```bash
 git clone https://github.com/Burak4Arslan/huawei-watch-sideload-ios.git HuaSideload && cd HuaSideload

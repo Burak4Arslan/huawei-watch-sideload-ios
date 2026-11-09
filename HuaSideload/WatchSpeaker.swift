@@ -36,6 +36,9 @@ final class WatchSpeaker: NSObject, ObservableObject, CXProviderDelegate {
     var onEnded: (() -> Void)?
     // The mic was switched off on the watch and on again; argument: how long it was off (seconds)
     var onMicToggled: ((TimeInterval) -> Void)?
+    // The watch mic's audio while the speaker is on, for a feature that listens (e.g. voice commands).
+    // Called on the audio thread; the feature decides what to do with it, the speaker itself keeps nothing.
+    var onMicAudio: ((AVAudioPCMBuffer) -> Void)?
     enum VolumeGesture { case wiggle, doubleWiggle, bottom }
     var onVolumeGesture: ((VolumeGesture) -> Void)?
 
@@ -144,10 +147,13 @@ final class WatchSpeaker: NSObject, ObservableObject, CXProviderDelegate {
             silence.frameLength = 16_000
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: format)
-            if watchesMic && AVAudioApplication.shared.recordPermission == .granted {
+            let micAudio = onMicAudio
+            if (watchesMic || micAudio != nil) && AVAudioApplication.shared.recordPermission == .granted {
                 let input = engine.inputNode
+                let levels = watchesMic
                 input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
-                    guard let data = buffer.floatChannelData?[0] else { return }
+                    micAudio?(buffer)
+                    guard levels, let data = buffer.floatChannelData?[0] else { return }
                     var peak: Float = 0
                     for i in 0..<Int(buffer.frameLength) { peak = max(peak, abs(data[i])) }
                     DispatchQueue.main.async { self?.micLevel(peak) }

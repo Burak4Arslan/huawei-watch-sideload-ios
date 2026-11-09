@@ -29,8 +29,8 @@ targets:
       path: HuaSideload/Info.plist
       properties:
         CFBundleDisplayName: HuaSideload
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.1"
+        CFBundleVersion: "2"
         NSBluetoothAlwaysUsageDescription: Needed to connect to your Huawei watch over Bluetooth.
         # voip: the watch speaker rings the watch with a CallKit call (refused without it); audio: keeps it playing when locked
         UIBackgroundModes: [bluetooth-central, audio, voip]

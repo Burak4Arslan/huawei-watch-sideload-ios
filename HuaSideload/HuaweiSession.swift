@@ -611,8 +611,16 @@ final class HuaweiSession {
 
         let statusName = L("Setup status", "Kurulum durumu")
         if support.sendsSetUpStatus {
-            record(statusName, await send(statusName, PairingSetup.deviceConfig, PairingSetup.setUpDeviceStatusCommand,
-                                          PairingSetup.setUpDeviceStatus(watchName: watchName)))
+            // A GT 3 SE never answers this one but applies it (it left the setup screen). Gadgetbridge also moves on
+            // without an answer, so silence is not a failure; a rejection still is.
+            do {
+                record(statusName, .success(try await request(PairingSetup.deviceConfig, PairingSetup.setUpDeviceStatusCommand,
+                                                              PairingSetup.setUpDeviceStatus(watchName: watchName), label: statusName, timeout: 3)))
+            } catch HuaweiSessionError.timeout(_) {
+                result.sent.append(statusName + L(" (no answer)", " (cevapsız)"))
+            } catch {
+                record(statusName, .failure(error))
+            }
         } else {
             result.skipped.append(statusName)
         }

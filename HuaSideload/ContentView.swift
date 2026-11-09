@@ -17,6 +17,8 @@ struct ContentView: View {
     @AppStorage(HuaweiSession.diagnosticsKey) private var pairingDiagnostics = false
     // Kept in the Keychain (CredentialStore), not in UserDefaults
     @State private var huaweiAccountId = CredentialStore.shared.string(CredentialStore.huaweiAccountKey) ?? ""
+    @AppStorage(WatchLink.pairingSetupKey) private var sendsPairingSetup = false
+    @AppStorage(WatchFaceUploadMethod.storageKey) private var faceUploadMethod = WatchFaceUploadMethod.bin.rawValue
     @State private var confirmingFirstPairing = false
     private var filmModeOffered: Bool { link.features.contains { $0.offersFilmMode } }
     private var filmMode: Bool { filmModeOffered && filmModeOn }
@@ -194,13 +196,6 @@ struct ContentView: View {
             if let busy = link.busy {
                 HStack { ProgressView(); Text(busy).foregroundStyle(.secondary) }
             }
-            if link.sharedWithOtherApp {
-                Label(L("Huawei Health (or another app) is connected to this watch too. Force-quit it before pairing or installing.",
-                        "Huawei Health (ya da başka bir uygulama) da bu saate bağlı. Eşleşmeden veya yüklemeden önce onu tamamen kapat."),
-                      systemImage: "exclamationmark.triangle")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-            }
             if !link.isPaired {
                 // A first pairing (PIN + HiChain) creates this app's own pairing on the watch; a saved key only reconnects
                 Button(link.hasSavedPairing ? L("Pair (saved key)", "Eşleş (kayıtlı anahtarla)") : L("Pair", "Eşleş")) {
@@ -212,15 +207,26 @@ struct ContentView: View {
                     Button(L("Pair now", "Şimdi eşleş")) { link.pair() }
                     Button(L("Cancel", "Vazgeç"), role: .cancel) {}
                 } message: {
-                    Text(L("This creates HuaSideload's own pairing on the watch (you confirm it on the watch). Gadgetbridge reports that the watch keeps working with Huawei Health when the phone sends the same Huawei account ID; this is not verified on a Watch Fit 4 Pro with HarmonyOS 6.1. If you want to keep using Huawei Health, enter your account ID first.",
-                           "Bu, saatte HuaSideload'un kendi eşleşmesini oluşturur (saatte onaylarsın). Gadgetbridge'e göre telefon aynı Huawei hesap ID'sini gönderirse saat Huawei Health ile çalışmaya devam eder; bu Watch Fit 4 Pro / HarmonyOS 6.1'de doğrulanmadı. Huawei Health'i kullanmaya devam etmek istiyorsan önce hesap ID'sini gir."))
+                    Text(sendsPairingSetup
+                         ? L("This creates HuaSideload's own pairing on the watch (you confirm it on the watch), then sends the setup with the Huawei account ID above. If the watch says the accounts don't match and offers a reset, do NOT reset: close the app and turn the setup off.",
+                             "Bu, saatte HuaSideload'un kendi eşleşmesini oluşturur (saatte onaylarsın), sonra yukarıdaki Huawei hesap ID'siyle kurulumu gönderir. Saat hesapların eşleşmediğini söyleyip sıfırlamayı önerirse SIFIRLAMA: uygulamayı kapat ve kurulumu kapat.")
+                         : L("This creates HuaSideload's own pairing on the watch (you confirm it on the watch).",
+                             "Bu, saatte HuaSideload'un kendi eşleşmesini oluşturur (saatte onaylarsın)."))
                 }
                 if !filmMode {
-                    SecureField(L("Huawei account ID (optional, 17 digits)", "Huawei hesap ID'si (isteğe bağlı, 17 hane)"), text: $huaweiAccountId)
-                        .keyboardType(.numberPad)
-                        .onChange(of: huaweiAccountId) { _, value in
-                            CredentialStore.shared.set(value.trimmingCharacters(in: .whitespacesAndNewlines), for: CredentialStore.huaweiAccountKey)
-                        }
+                    Toggle(L("Send setup after pairing (newer watches)", "Eşleşmeden sonra kurulum gönder (yeni saatler)"), isOn: $sendsPairingSetup)
+                    if sendsPairingSetup {
+                        Label(L("For a watch set up without Huawei Health (new or factory-reset: this sets it up, tested on a GT 3 SE) and for watches that report \"Pairing failed\" without it (e.g. Watch Fit 4 Pro). It tells the watch which Huawei account it belongs to: on a watch set up with Huawei Health, an empty or wrong account ID makes the watch say \"phone and watch accounts don't match\" and offer a factory reset. Never tap Reset on the watch; close the app and turn this off.",
+                                "Huawei Health olmadan kurulan saat için (yeni ya da sıfırlanmış: saati bununla kurar, GT 3 SE'de denendi) ve bu olmadan \"Eşleşme başarısız\" diyen saatler için (ör. Watch Fit 4 Pro). Saate hangi Huawei hesabına ait olduğunu söyler: Huawei Health ile kurulmuş saatte boş ya da yanlış hesap ID'si saate \"telefon ve saat hesapları eşleşmiyor\" dedirtir ve fabrika ayarlarına sıfırlamayı önerir. Saatte asla Sıfırla'ya basma; uygulamayı kapat ve bunu kapat."),
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                        SecureField(L("Huawei account ID (empty: no account)", "Huawei hesap ID'si (boş: hesap yok)"), text: $huaweiAccountId)
+                            .keyboardType(.numberPad)
+                            .onChange(of: huaweiAccountId) { _, value in
+                                CredentialStore.shared.set(value.trimmingCharacters(in: .whitespacesAndNewlines), for: CredentialStore.huaweiAccountKey)
+                            }
+                    }
                 }
             } else if !filmMode {
                 Button(L("Refresh battery and watch info", "Pil ve saat bilgisini yenile")) { link.refresh() }
@@ -234,8 +240,8 @@ struct ContentView: View {
                 Text(L("To go back to Huawei Health: tap Disconnect, then open Huawei Health. Disconnecting keeps the watch's data, its Huawei Health pairing and HuaSideload's saved key; it is not Forget pairing and not a reset.",
                        "Huawei Health'e dönmek için: Bağlantıyı kes'e dokun, sonra Huawei Health'i aç. Bağlantıyı kesmek saatin verilerini, Huawei Health eşleşmesini ve HuaSideload'un kayıtlı anahtarını korur; eşleşmeyi unutmak ya da sıfırlamak değildir."))
             } else if !link.isPaired && !link.hasSavedPairing && !filmMode {
-                Text(L("Close Huawei Health before pairing (swipe it up in the app switcher). The watch may ask for confirmation the first time. A watch set up with Huawei Health may still be tied to that Huawei account: if it reports \"Pairing failed\", enter the account ID (the userId cookie on cloud.huawei.com, see Gadgetbridge's Huawei pairing guide) and pair again.",
-                       "Eşleşmeden önce Huawei Health'i kapat (uygulama değiştiriciden yukarı kaydır). İlk eşleşmede saatin ekranında onay çıkabilir. Huawei Health ile kurulan saat o Huawei hesabına bağlı kalabilir: saat \"Eşleşme başarısız\" derse hesap ID'sini gir (cloud.huawei.com'daki userId çerezi, Gadgetbridge'in Huawei eşleşme rehberine bak) ve tekrar eşleş."))
+                Text(L("Close Huawei Health before pairing (swipe it up in the app switcher). The watch may ask for confirmation the first time. A watch set up with Huawei Health may still be tied to that Huawei account: if it reports \"Pairing failed\", turn on \"Send setup after pairing\", enter the account ID (the userId cookie on cloud.huawei.com, see Gadgetbridge's Huawei pairing guide) and pair again.",
+                       "Eşleşmeden önce Huawei Health'i kapat (uygulama değiştiriciden yukarı kaydır). İlk eşleşmede saatin ekranında onay çıkabilir. Huawei Health ile kurulan saat o Huawei hesabına bağlı kalabilir: saat \"Eşleşme başarısız\" derse \"Eşleşmeden sonra kurulum gönder\"i aç, hesap ID'sini gir (cloud.huawei.com'daki userId çerezi, Gadgetbridge'in Huawei eşleşme rehberine bak) ve tekrar eşleş."))
             }
         }
     }
@@ -317,6 +323,11 @@ struct ContentView: View {
                 Button(L("Install a watch face (.hwt)", "Saate kadran yükle (.hwt)")) { pickingWatchFace = true }
                     .disabled(link.busy != nil)
                     .fontWeight(WatchFaceCatalog.all.isEmpty ? .semibold : .regular)
+                // Newer watches may want the face in another form; nothing tells which, so it is a setting to try
+                Picker(L("Upload method", "Yükleme yöntemi"), selection: $faceUploadMethod) {
+                    ForEach(WatchFaceUploadMethod.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                .disabled(link.busy != nil)
             }
         } header: {
             Text(L("Watch faces", "Kadranlar"))

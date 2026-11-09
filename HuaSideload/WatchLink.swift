@@ -47,8 +47,6 @@ final class WatchLink: NSObject, ObservableObject {
     @Published private(set) var watchFaceCompatibility: WatchFaceCompatibility?
     // The watch's watch face screen and engine (0x27/0x01), asked once per connection
     @Published private(set) var watchFaceParams: WatchFaceService.DeviceParams?
-    // The connected watch is also held by another app on this iPhone (usually Huawei Health)
-    @Published private(set) var sharedWithOtherApp = false
     private var faceConfirms: [String: WatchFaceService.ConfirmReport] = [:]
     // The latest WatchfaceConfirm, whatever name the watch used for the face
     private var lastFaceConfirm: WatchFaceService.ConfirmReport?
@@ -73,6 +71,8 @@ final class WatchLink: NSObject, ObservableObject {
     // Reconnect and pair again automatically when the connection drops
     private var wantsConnection = false
     private static let lastWatchKey = "lastWatch"
+    // Send the setup messages after pairing (PairingSetup). Off by default, see pair()
+    static let pairingSetupKey = "HuaSideloadPairingSetup"
 
     // Optional: the Huawei account ID the watch was set up with (Watch tab), kept in the Keychain. Sent in the setup
     // after HiChain; without it the watch is told "no account", as Gadgetbridge does.
@@ -236,13 +236,6 @@ final class WatchLink: NSObject, ObservableObject {
         wantsConnection = true
         UserDefaults.standard.set(device.id.uuidString, forKey: Self.lastWatchKey)
         append(.info, L("Connecting to \(device.name)…", "\(device.name) cihazına bağlanılıyor…"))
-        // iOS shares one Bluetooth link per device between apps: if Huawei Health is connected too, both would talk
-        // to the watch at the same time over the same channel
-        sharedWithOtherApp = device.systemConnected
-        if device.systemConnected {
-            append(.error, L("Another app on this iPhone (usually Huawei Health) is connected to this watch. Force-quit Huawei Health before pairing or installing; do not use both at the same time.",
-                             "Bu iPhone'daki başka bir uygulama (genelde Huawei Health) bu saate bağlı. Eşleşmeden veya yüklemeden önce Huawei Health'i tamamen kapat; ikisini aynı anda kullanma."))
-        }
         central.connect(device.peripheral)
 
         Task { [weak self] in
@@ -311,7 +304,6 @@ final class WatchLink: NSObject, ObservableObject {
         isPaired = false
         pairingStage = .none
         watchFaceParams = nil
-        sharedWithOtherApp = false
         faceConfirms.removeAll()
         connectedName = nil
         battery = nil
@@ -334,19 +326,26 @@ final class WatchLink: NSObject, ObservableObject {
             }
             self.isPaired = true
 
-            // Before anything else, like Gadgetbridge: the watch waits for these after HiChain (PairingSetup)
-            self.pairingStage = .finishingSetup
-            let setup = await session.completeSetup(watchName: self.connectedName ?? "", accountId: Self.huaweiAccountId)
-            if !setup.sent.isEmpty { self.append(.success, L("Setup sent: ", "Kurulum gönderildi: ") + setup.sent.joined(separator: ", ")) }
-            if !setup.skipped.isEmpty { self.append(.info, L("Not asked for by the watch: ", "Saatin istemediği: ") + setup.skipped.joined(separator: ", ")) }
-            if setup.failed.isEmpty {
-                self.pairingStage = .paired
-                self.append(.success, L("PAIRED: HiChain finished and the watch accepted the setup. Check that the watch shows no error.",
-                                        "EŞLEŞTİ: HiChain bitti ve saat kurulumu kabul etti. Saatte hata çıkmadığını kontrol et."))
+            // Off by default: on a GT 3 SE set up with Huawei Health, the account message made the watch ask for a
+            // factory reset ("phone and watch accounts don't match"). Newer watches (Watch Fit 4 Pro) need it.
+            if UserDefaults.standard.bool(forKey: Self.pairingSetupKey) {
+                // Like Gadgetbridge: the watch waits for these after HiChain (PairingSetup)
+                self.pairingStage = .finishingSetup
+                let setup = await session.completeSetup(watchName: self.connectedName ?? "", accountId: Self.huaweiAccountId)
+                if !setup.sent.isEmpty { self.append(.success, L("Setup sent: ", "Kurulum gönderildi: ") + setup.sent.joined(separator: ", ")) }
+                if !setup.skipped.isEmpty { self.append(.info, L("Not asked for by the watch: ", "Saatin istemediği: ") + setup.skipped.joined(separator: ", ")) }
+                if setup.failed.isEmpty {
+                    self.pairingStage = .paired
+                    self.append(.success, L("PAIRED: HiChain finished and the watch accepted the setup. Check that the watch shows no error.",
+                                            "EŞLEŞTİ: HiChain bitti ve saat kurulumu kabul etti. Saatte hata çıkmadığını kontrol et."))
+                } else {
+                    let why = setup.failed.joined(separator: ", ")
+                    self.pairingStage = .setupIncomplete(why)
+                    self.append(.error, L("Setup not accepted by the watch: ", "Saat kurulumu kabul etmedi: ") + why)
+                }
             } else {
-                let why = setup.failed.joined(separator: ", ")
-                self.pairingStage = .setupIncomplete(why)
-                self.append(.error, L("Setup not accepted by the watch: ", "Saat kurulumu kabul etmedi: ") + why)
+                self.pairingStage = .paired
+                self.append(.success, L("PAIRED! The connection to the watch is now encrypted.", "EŞLEŞME TAMAM! Artık saatle şifreli konuşuyoruz."))
             }
             self.watchUDID = session.watchUDID
             if let udid = session.watchUDID { self.addSecret(udid) }
@@ -698,6 +697,17 @@ final class WatchLink: NSObject, ObservableObject {
                 self.append(.success, L("Transfer finished (the watch accepted the file as \(faceName)). Waiting for it to confirm and list the face…",
                                         "Aktarım bitti (saat dosyayı \(faceName) olarak aldı). Saatin kadranı onaylayıp listelemesi bekleniyor…"))
 
+                // A watch that does not answer the face list (0x27/0x02) cannot be followed: report it as before
+                guard before != nil else {
+                    session.stopTrace()
+                    let done = L("Watch face sent. On the watch, touch and hold the watch face and pick \(title).",
+                                 "Kadran gönderildi. Saatte kadrana basılı tut ve listeden \(title) kadranını seç.")
+                    self.setFaceStage(.transferred)
+                    self.watchFaceStatus = done
+                    self.append(.success, done)
+                    return
+                }
+
                 // The watch sends WatchfaceConfirm (0x27/0x05) once it has stored the face; HuaweiSession answers it at
                 // any time. Gadgetbridge has no deadline for it, and storing a face can take a while, so the list is
                 // checked every few seconds for up to 90 s instead of once after 20 s.
@@ -1047,10 +1057,7 @@ extension WatchLink: @preconcurrency CBPeripheralDelegate {
         if huaweiChannelReady {
             pairingStage = .channelReady
             append(.success, L("Huawei channel ready. BLE write limit: \(maxWriteLength) bytes", "Huawei kanalı hazır. BLE yazma sınırı: \(maxWriteLength) bayt"))
-            if hasSavedPairing && sharedWithOtherApp {
-                append(.info, L("Saved pairing found, but another app is connected to the watch: not pairing automatically. Close Huawei Health, then tap Pair.",
-                                "Kayıtlı eşleşme var ama saate başka bir uygulama bağlı: otomatik eşleşilmiyor. Huawei Health'i kapat, sonra Eşleş'e dokun."))
-            } else if hasSavedPairing {
+            if hasSavedPairing {
                 append(.info, L("Saved pairing found, pairing automatically…", "Kayıtlı eşleşme var, otomatik eşleşiliyor…"))
                 pair()
             } else {

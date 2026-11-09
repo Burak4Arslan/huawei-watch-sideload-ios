@@ -12,9 +12,15 @@ faces**, **uploads music** to the watch's player, gives your watch apps a JSON m
 **plays the iPhone's audio on the watch speaker** (with a call trick). Three ready-made games (Dino, Flappy, Snake)
 and two watch faces are included.
 
-> **Huawei Health:** set the watch up once with Huawei Health as usual (language, region, terms). After that
-> HuaSideload pairs with the watch on its own and does not need Huawei Health. Setting up a brand-new or
-> factory-reset watch with HuaSideload alone has not been tested.
+> **Huawei Health:** two ways, pick one:
+> - **With Huawei Health:** set the watch up once with Huawei Health as usual. After that HuaSideload pairs with the
+>   watch on its own; leave **Send setup after pairing** off.
+> - **Without Huawei Health:** a new or factory-reset watch can be set up by HuaSideload alone: turn on **Send setup
+>   after pairing** (Watch tab), leave the account ID empty and pair. Tested on a GT 3 SE. The watch then belongs to
+>   no Huawei account; pairing it with Huawei Health later resets it.
+>
+> Don't mix the two: on a watch set up with Huawei Health, the setup with an empty account ID makes the watch offer a
+> factory reset.
 
 The Huawei protocol is a Swift port of [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge)'s
 implementation. The app UI is available in **English and Turkish** (globe menu, top right).
@@ -95,6 +101,8 @@ If the SDK or Node live elsewhere, set `OHOS_SDK=/path` or `NODE16=/path/to/node
 Settings → General → VPN & Device Management → trust your Apple ID, and turn on Developer Mode if iOS asks. With a
 free Apple ID the app has to be reinstalled every 7 days. If your own watch apps will message the phone (4.4), build
 the app yourself instead: the sideloading tool may change the bundle ID.
+To build an unsigned IPA with your own bundle ID without a Mac, fork the repository and run
+*Actions → Build unsigned IPA*.
 
 **Building it yourself (Mac + Xcode):**
 
@@ -339,6 +347,9 @@ Fixes to the core then reach both projects automatically.
 
 - **The watch is not in the list:** if it's actively connected to another phone or to Huawei Health it may not show up. Close Health, toggle Bluetooth, **Find watch**.
 - **"Verification failed: the saved key is no longer valid":** the watch was reset. **Forget pairing** → **Pair** again.
+- **Newer watches (Watch Fit 4 Pro, GT 6, GT 7…): "Pairing failed" right after pairing:** these watches wait for setup messages after pairing. Turn on **Send setup after pairing (newer watches)** on the **Watch** tab and pair again; if the watch was set up with Huawei Health, enter that Huawei account ID first. ⚠️ With a watch set up with Huawei Health and an empty or wrong account ID, the watch says "phone and watch accounts don't match" and offers a factory reset. Never tap Reset on the watch; close the app and turn the setting off.
+- **Pairing stops at "HiChain JSON could not be decoded" or you want to report a pairing problem:** turn on pairing diagnostics (**Log** tab) and attach the log. It shows packet layouts only, no keys, PIN, UDID or MAC.
+- **The watch face transfers but never shows up on the watch:** try another **Upload method** under Watch faces. Full HarmonyOS watches may want the whole package instead of watchface.bin. The app checks the watch's face list for up to 90 s and logs what it found.
 - **Install fails with 103:** see the table in section 5. Start with `python3 tools/check-watch-bin.py WatchApps/X.bin`.
 - **"Could not reach the phone (is HuaSideload open?)":** the iPhone app must be running and connected to the watch. It also works in the background, but not after you force-quit it.
 - **The watch loses the phone after a while:** check that HuaSideload wasn't swiped away (section 3, "In the background"). The log shows "iOS relaunched the app in the background for the watch" when iOS brought it back.
@@ -405,5 +416,6 @@ ace-loader (webpack lite) → restool → haptobin_tool → hap-sign-tool `sign-
 - The watch-side install rules were found by reading OpenHarmony's `appexecfwk_lite` and `security_appverify` sources (Apache-2.0).
 - The games are fan-made tributes and are not affiliated with the original games or their owners: Dino follows Chrome's offline dinosaur game, Flappy is inspired by Flappy Bird, Snake by the classic Nokia game. All their images are drawn by the scripts in this repository.
 - `bridge.js` follows the logic of Huawei's Wear Engine lite wearable JS SDK (Apache-2.0), trimmed down.
+- [The-jawi](https://github.com/The-jawi) contributed the tolerant HiChain reply parsing, the setup messages after pairing, Keychain storage for pairing keys, watch face confirmation (service 0x27), the unit tests and the IPA build workflow, while getting a Watch Fit 4 Pro to pair.
 
 HUAWEI, HarmonyOS and AppGallery are trademarks of Huawei Technologies Co., Ltd. This project is not affiliated with Huawei.

@@ -8,7 +8,7 @@ on:
       bundle_id:
         description: "Bundle ID (make it unique, e.g. com.yourname.huasideload)"
         required: true
-        default: "com.thejawi.huasideload"
+        default: "com.example.huasideload"
 
 permissions:
   contents: read

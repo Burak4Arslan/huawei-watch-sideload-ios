@@ -88,11 +88,19 @@ enum HiChainJSON {
             throw DecodeError.notAnObject(report, firstByte: "a non-object value")
         }
         report.topLevelKeys = value.keys.sorted()
-        guard let payload = value["payload"] as? [String: Any] else {
+        // An error reply may carry its errorCode at the top level with no payload; the caller reports it
+        guard let payload = value["payload"] as? [String: Any] ?? (errorText(value) != nil ? [:] : nil) else {
             throw DecodeError.noPayload(report, found: typeName(value["payload"]))
         }
         report.payloadKeys = payload.keys.sorted()
         return Envelope(value: value, payload: payload, report: report)
+    }
+
+    // A nonzero "errorCode" with the watch's "errorReason" when it sends one, e.g. "4 (auth failed)"; nil otherwise
+    static func errorText(_ object: [String: Any]) -> String? {
+        guard let code = object["errorCode"] as? Int, code != 0 else { return nil }
+        if let reason = object["errorReason"] as? String, !reason.isEmpty { return "\(code) (\(reason))" }
+        return "\(code)"
     }
 
     // The first complete top-level object, like org.json's JSONObject(String); raw control characters inside

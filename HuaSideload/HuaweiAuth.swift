@@ -323,8 +323,8 @@ struct HiChainMessage {
         }
         report(envelope.report.summary, envelope.report.adjusted)
         let payload = envelope.payload
-        if let code = payload["errorCode"] as? Int, code != 0 {
-            throw HuaweiAuthError.watchError("HiChain errorCode \(code)")
+        if let error = HiChainJSON.errorText(envelope.value) ?? HiChainJSON.errorText(payload) {
+            throw HuaweiAuthError.watchError("HiChain errorCode \(error)")
         }
         if payload["isoSalt"] != nil { return .step(1, payload) }
         if payload["returnCodeMac"] != nil { return .step(2, payload) }

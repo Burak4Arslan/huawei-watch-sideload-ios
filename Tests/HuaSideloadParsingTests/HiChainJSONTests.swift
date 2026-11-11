@@ -81,6 +81,19 @@ final class HiChainJSONTests: XCTestCase {
     func testErrorCodeIsReadable() throws {
         let e = try decode(bytes(#"{"payload":{"errorCode":4}}"#))
         XCTAssertEqual(e.payload["errorCode"] as? Int, 4)
+        XCTAssertEqual(HiChainJSON.errorText(e.payload), "4")
+    }
+
+    func testErrorReasonIsShown() throws {
+        let e = try decode(bytes(#"{"payload":{"errorCode":4,"errorReason":"auth failed"}}"#))
+        XCTAssertEqual(HiChainJSON.errorText(e.payload), "4 (auth failed)")
+        XCTAssertNil(HiChainJSON.errorText(["errorCode": 0, "errorReason": "ok"]))
+    }
+
+    func testTopLevelErrorWithoutPayload() throws {
+        let e = try decode(bytes(#"{"errorCode":12,"errorReason":"busy"}"#))
+        XCTAssertTrue(e.payload.isEmpty)
+        XCTAssertEqual(HiChainJSON.errorText(e.value), "12 (busy)")
     }
 
     // MARK: - Malformed replies

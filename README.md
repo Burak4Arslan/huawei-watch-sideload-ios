@@ -2,13 +2,13 @@
 
 <h1 align="center">HuaSideload</h1>
 
-<p align="center"><b>Sideload your own apps and music onto Huawei watches from an iPhone.</b><br>No Android phone needed.</p>
+<p align="center"><b>Install custom watch faces, your own apps and music on Huawei watches from an iPhone.</b><br>No Android phone needed.</p>
 
-Huawei Health on iPhone can pair with a Huawei watch, but it cannot install third-party watch apps or copy
-music to the watch; Huawei only allows that from Android phones. **HuaSideload** is an iOS app that talks
-to Huawei *lite wearable* watches directly over Bluetooth LE: it pairs with the watch, **installs your own
-watch apps** (signed HarmonyOS/OpenHarmony lite JS apps, built with the included tools), **installs watch
-faces**, **uploads music** to the watch's player, gives your watch apps a JSON message channel to the iPhone, and
+Huawei Health on iPhone can pair with a Huawei watch, but it cannot install custom watch faces, third-party watch
+apps or music; Huawei only allows that from Android phones. **HuaSideload** is an iOS app that talks
+to Huawei *lite wearable* watches directly over Bluetooth LE: it pairs with the watch, **installs custom
+watch faces** (any `.hwt`), **installs your own watch apps** (signed HarmonyOS/OpenHarmony lite JS apps, built with
+the included tools), **uploads music** to the watch's player, gives your watch apps a JSON message channel to the iPhone, and
 **plays the iPhone's audio on the watch speaker** (with a call trick). Three ready-made games (Dino, Flappy, Snake)
 and two watch faces are included.
 
@@ -46,8 +46,9 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 - Pairs with the watch over BLE (HiChain), encrypted connection, automatic reconnect; stays connected in the
   background, even when iOS closes the app (it relaunches the app for the watch)
 - Battery and watch info, notifications to the watch
+- **Installs custom watch faces** (any `.hwt`, e.g. from Huawei Theme Studio); no debug profile needed, two
+  ready-made faces are bundled (section 4.6)
 - **Installs and removes your own watch apps** (signed `.bin` with a debug profile)
-- **Installs watch faces** (`.hwt` from Huawei Theme Studio); two ready-made faces are bundled
 - Comes with three games to build for your watch: **Dino, Flappy, Snake** (section 4.5)
 - Uploads **MP3/M4A/AAC/FLAC/WAV/OPUS** to the watch's own music player (to listen without the phone)
 - **JSON messaging** between your watch apps and the phone (Wear Engine P2P)
@@ -268,6 +269,12 @@ Watch faces don't need a debug profile. Every `.hwt` in `WatchFaces/` is bundled
 on the **Install** tab under **Watch faces** with an install button; **Install a watch face (.hwt)** uploads any other `.hwt` file.
 After the upload, touch and hold the watch face on the watch and pick the new one.
 
+**Newer watches and bands (e.g. Band 11) reject the upload with error 100004** until the phone tells them the Huawei
+account they belong to: turn on **Send setup after pairing** on the **Watch** tab, enter the Huawei account ID the
+watch was set up with, then **Forget pairing** → **Pair** and install again
+([#4](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/4)). Never tap Reset if the watch offers one.
+The face stays on the watch after you switch back to Huawei Health.
+
 | | | |
 |---|---|---|
 | <img src="docs/face-donen.png" width="180" alt="Donen watch face"> | **Donen** ("spinning" in Turkish) | no hands: the hour, minute and second rings turn under a fixed red window |
@@ -350,6 +357,7 @@ Fixes to the core then reach both projects automatically.
 - **"Verification failed: the saved key is no longer valid":** the watch was reset. **Forget pairing** → **Pair** again.
 - **Newer watches (Watch Fit 4 Pro, GT 6, GT 7…): "Pairing failed" right after pairing:** these watches wait for setup messages after pairing. Turn on **Send setup after pairing (newer watches)** on the **Watch** tab and pair again; if the watch was set up with Huawei Health, enter that Huawei account ID first. ⚠️ With a watch set up with Huawei Health and an empty or wrong account ID, the watch says "phone and watch accounts don't match" and offers a factory reset. Never tap Reset on the watch; close the app and turn the setting off.
 - **Pairing stops at "HiChain JSON could not be decoded" or you want to report a pairing problem:** turn on pairing diagnostics (**Log** tab) and attach the log. It shows packet layouts only, no keys, PIN, UDID or MAC.
+- **Watch face install fails with 100004:** the watch wants its Huawei account ID first, see section 4.6.
 - **The watch face transfers but never shows up on the watch:** try another **Upload method** under Watch faces. Full HarmonyOS watches may want the whole package instead of watchface.bin. The app checks the watch's face list for up to 90 s and logs what it found.
 - **Install fails with 103:** see the table in section 5. Start with `python3 tools/check-watch-bin.py WatchApps/X.bin`.
 - **"Could not reach the phone (is HuaSideload open?)":** the iPhone app must be running and connected to the watch. It also works in the background, but not after you force-quit it.

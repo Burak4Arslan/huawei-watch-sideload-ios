@@ -65,9 +65,9 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 
 **Tested watch:** HUAWEI WATCH GT 3 SE (firmware 3.0.0.69, OpenHarmony 1.1 based lite wearable, API 6,
 466×466 round screen). **Reported working by users:** HUAWEI WATCH GT 3 (custom watch face, iOS 26.6.1,
-[#5](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/5)); HUAWEI Band 11 (custom watch face on two
+[#5](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/5)); HUAWEI Band 11 (custom watch face on two
 bands, firmware 6.0.0.130, needs the account setup from section 4.6,
-[#4](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/4)). Other Huawei *lite wearable* watches on
+[#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)). Other Huawei *lite wearable* watches on
 the same platform (GT 2 Pro, …) will likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 > ⚠️ **Disclaimer:** This uses an unofficial protocol. Pairing with HuaSideload may break the Huawei Health
@@ -100,7 +100,7 @@ If the SDK or Node live elsewhere, set `OHOS_SDK=/path` or `NODE16=/path/to/node
 ## 3. Install the iPhone app and pair the watch
 
 **Without a Mac (prebuilt app):** download `HuaSideload-x.y.ipa` from
-[Releases](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/releases/latest) and install it with
+[Releases](https://github.com/burak4arslan/huawei-watch-sideload-ios/releases/latest) and install it with
 [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using your own Apple ID. Then on the iPhone:
 Settings → General → VPN & Device Management → trust your Apple ID, and turn on Developer Mode if iOS asks. With a
 free Apple ID the app has to be reinstalled every 7 days. If your own watch apps will message the phone (4.4), build
@@ -111,7 +111,7 @@ To build an unsigned IPA with your own bundle ID without a Mac, fork the reposit
 **Building it yourself (Mac + Xcode):**
 
 ```bash
-git clone https://github.com/Burak4Arslan/huawei-watch-sideload-ios.git HuaSideload && cd HuaSideload
+git clone https://github.com/burak4arslan/huawei-watch-sideload-ios.git HuaSideload && cd HuaSideload
 cp Config/local.env.example Config/local.env   # fill in your Team ID and bundle ID
 ./generate.sh                                  # creates HuaSideload.xcodeproj
 open HuaSideload.xcodeproj                     # pick your iPhone, Run
@@ -274,7 +274,7 @@ After the upload, touch and hold the watch face on the watch and pick the new on
 **Newer watches and bands (e.g. Band 11) reject the upload with error 100004** until the phone tells them the Huawei
 account they belong to: turn on **Send setup after pairing** on the **Watch** tab, enter the Huawei account ID the
 watch was set up with, then **Forget pairing** → **Pair** and install again
-([#4](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/4)). Never tap Reset if the watch offers one.
+([#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)). Never tap Reset if the watch offers one.
 The face stays on the watch after you switch back to Huawei Health.
 
 | | | |
@@ -365,7 +365,7 @@ Fixes to the core then reach both projects automatically.
 - **"Could not reach the phone (is HuaSideload open?)":** the iPhone app must be running and connected to the watch. It also works in the background, but not after you force-quit it.
 - **The watch loses the phone after a while:** check that HuaSideload wasn't swiped away (section 3, "In the background"). The log shows "iOS relaunched the app in the background for the watch" when iOS brought it back.
 - **Watch speaker: "not connected to the iPhone for calls":** in the iPhone's Bluetooth settings, tap the watch to connect it; calls must ring on the watch.
-- **Questions and bug reports:** [GitHub Issues](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues). Attach the log.
+- **Questions and bug reports:** [GitHub Issues](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues). Attach the log.
 - **Sharing the log:** **Copy** on the **Log** tab. Identity details stay masked unless **Show identity** is on.
 - **Live log on a Mac** (unlock the iPhone first; every line starts with `[HuaSideload]`):
   ```bash

@@ -63,8 +63,9 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 - Give watch apps internet access (but the phone app can send them any data)
 
 **Tested watch:** HUAWEI WATCH GT 3 SE (firmware 3.0.0.69, OpenHarmony 1.1 based lite wearable, API 6,
-466×466 round screen). Other Huawei *lite wearable* watches on the same platform (GT 2 Pro, GT 3, …) will
-likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
+466×466 round screen). **Reported working by users:** HUAWEI WATCH GT 3 (custom watch face, iOS 26.6.1,
+[#5](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/5)). Other Huawei *lite wearable* watches on
+the same platform (GT 2 Pro, …) will likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 > ⚠️ **Disclaimer:** This uses an unofficial protocol. Pairing with HuaSideload may break the Huawei Health
 > connection; if something goes wrong you may need to reset the watch and pair it with Health again.

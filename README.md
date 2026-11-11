@@ -65,7 +65,9 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 
 **Tested watch:** HUAWEI WATCH GT 3 SE (firmware 3.0.0.69, OpenHarmony 1.1 based lite wearable, API 6,
 466×466 round screen). **Reported working by users:** HUAWEI WATCH GT 3 (custom watch face, iOS 26.6.1,
-[#5](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/5)). Other Huawei *lite wearable* watches on
+[#5](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/5)); HUAWEI Band 11 (custom watch face on two
+bands, firmware 6.0.0.130, needs the account setup from section 4.6,
+[#4](https://github.com/Burak4Arslan/huawei-watch-sideload-ios/issues/4)). Other Huawei *lite wearable* watches on
 the same platform (GT 2 Pro, …) will likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 > ⚠️ **Disclaimer:** This uses an unofficial protocol. Pairing with HuaSideload may break the Huawei Health

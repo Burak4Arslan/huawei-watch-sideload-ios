@@ -4,7 +4,7 @@
 
 <p align="center"><b>Install custom watch faces, your own apps and music on Huawei watches from an iPhone.</b><br>No Android phone needed.</p>
 
-<p align="center">▶ <a href="https://youtu.be/za6RO3lPc5c">The story behind this project</a> (YouTube, 10 min, Turkish with English subtitles)</p>
+<p align="center">▶ <a href="https://youtu.be/za6RO3lPc5c">The story behind this project</a> (YouTube, 10 min, in Turkish and English)</p>
 
 Huawei Health on iPhone can pair with a Huawei watch, but it cannot install custom watch faces, third-party watch
 apps or music; Huawei only allows that from Android phones. **HuaSideload** is an iOS app that talks

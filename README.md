@@ -21,8 +21,8 @@ and two watch faces are included.
 >   after pairing** (Watch tab), leave the account ID empty and pair. Tested on a GT 3 SE. The watch then belongs to
 >   no Huawei account; pairing it with Huawei Health later resets it.
 >
-> Don't mix the two: on a watch set up with Huawei Health, the setup with an empty account ID makes the watch offer a
-> factory reset.
+> Don't mix the two: on a watch set up with Huawei Health, the setup with an empty or wrong account ID can make the
+> watch reset itself. Not a big loss usually, you just set it up with Huawei Health again, but double-check the ID first.
 
 The Huawei protocol is a Swift port of [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge)'s
 implementation. The app UI is available in **English and Turkish** (globe menu, top right).
@@ -276,7 +276,8 @@ After the upload, touch and hold the watch face on the watch and pick the new on
 **Newer watches and bands (e.g. Band 11) reject the upload with error 100004** until the phone tells them the Huawei
 account they belong to: turn on **Send setup after pairing** on the **Watch** tab, enter the Huawei account ID the
 watch was set up with, then **Forget pairing** → **Pair** and install again
-([#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)). Never tap Reset if the watch offers one.
+([#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)). Double-check the ID first: with a wrong
+one the watch says the accounts don't match and may reset itself, so you'd have to set it up with Huawei Health again.
 The face stays on the watch after you switch back to Huawei Health.
 
 | | | |
@@ -359,7 +360,7 @@ Fixes to the core then reach both projects automatically.
 
 - **The watch is not in the list:** if it's actively connected to another phone or to Huawei Health it may not show up. Close Health, toggle Bluetooth, **Find watch**.
 - **"Verification failed: the saved key is no longer valid":** the watch was reset. **Forget pairing** → **Pair** again.
-- **Newer watches (Watch Fit 4 Pro, GT 6, GT 7…): "Pairing failed" right after pairing:** these watches wait for setup messages after pairing. Turn on **Send setup after pairing (newer watches)** on the **Watch** tab and pair again; if the watch was set up with Huawei Health, enter that Huawei account ID first. ⚠️ With a watch set up with Huawei Health and an empty or wrong account ID, the watch says "phone and watch accounts don't match" and offers a factory reset. Never tap Reset on the watch; close the app and turn the setting off.
+- **Newer watches (Watch Fit 4 Pro, GT 6, GT 7…): "Pairing failed" right after pairing:** these watches wait for setup messages after pairing. Turn on **Send setup after pairing (newer watches)** on the **Watch** tab and pair again; if the watch was set up with Huawei Health, enter that Huawei account ID first. ⚠️ Double-check the ID: with an empty or wrong account ID the watch says "phone and watch accounts don't match" and may reset itself. Then set it up with Huawei Health again and pair once more with the right ID.
 - **Pairing stops at "HiChain JSON could not be decoded" or you want to report a pairing problem:** turn on pairing diagnostics (**Log** tab) and attach the log. It shows packet layouts only, no keys, PIN, UDID or MAC.
 - **Watch face install fails with 100004:** the watch wants its Huawei account ID first, see section 4.6.
 - **The watch face transfers but never shows up on the watch:** try another **Upload method** under Watch faces. Full HarmonyOS watches may want the whole package instead of watchface.bin. The app checks the watch's face list for up to 90 s and logs what it found.

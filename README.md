@@ -76,8 +76,9 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 | HUAWEI WATCH GT 3 | – | Custom watch face | iOS 26.6.1 | [#5](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/5) |
 | HUAWEI WATCH GT 4 | 5.0.0.88 | Custom watch face | Needs the account setup (4.6) | [#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6) |
 | HUAWEI Band 11 | 6.0.0.130 | Custom watch face (two bands) | Needs the account setup (4.6) | [#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4) |
+| HUAWEI WATCH GT 2 Pro | – | Pairing, watch info, P2P messages to a watch app | Uses HiChain Lite pairing (experimental), added by [huydung1232007](https://github.com/huydung1232007/huawei-watch-sideload-ios) | Fork owner's tester |
 
-Other Huawei *lite wearable* watches on the same platform (GT 2 Pro, …) will likely work but are untested.
+Other Huawei *lite wearable* watches on the same platform (GT 2, …) will likely work but are untested.
 HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 > ⚠️ **Disclaimer:** This uses an unofficial protocol. Pairing with HuaSideload may break the Huawei Health

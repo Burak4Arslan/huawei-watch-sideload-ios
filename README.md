@@ -27,18 +27,21 @@ and two watch faces are included.
 The Huawei protocol is a Swift port of [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge)'s
 implementation. The app UI is available in **English and Turkish** (globe menu, top right).
 
+> 🛠 **Building your own watch apps or features?** Everything for developers is in the
+> **[developer guide](docs/DEVELOPMENT.md)**: signing, the sample app, the games, messaging with the phone,
+> watch app pitfalls and how the protocol works.
+
 ---
 
 ## Contents
 1. [What it does and doesn't do](#1-what-it-does-and-doesnt-do)
 2. [Requirements](#2-requirements)
 3. [Install the iPhone app and pair the watch](#3-install-the-iphone-app-and-pair-the-watch)
-4. [Your own watch app](#4-your-own-watch-app)
-5. [Things to know when writing watch apps](#5-things-to-know-when-writing-watch-apps)
-6. [Keeping your own features in a separate project](#6-keeping-your-own-features-in-a-separate-project)
-7. [Troubleshooting](#7-troubleshooting)
-8. [Project layout and how it works](#8-project-layout-and-how-it-works)
-9. [Credits and license](#9-credits-and-license)
+4. [Watch apps and watch faces](#4-watch-apps-and-watch-faces)
+5. [Troubleshooting](#5-troubleshooting)
+6. [Credits and license](#6-credits-and-license)
+
+**For developers:** [developer guide](docs/DEVELOPMENT.md) (own watch apps, signing, games, messaging, protocol)
 
 ---
 
@@ -51,7 +54,7 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 - **Installs custom watch faces** (any `.hwt`, e.g. from Huawei Theme Studio); no debug profile needed, two
   ready-made faces are bundled (section 4.6)
 - **Installs and removes your own watch apps** (signed `.bin` with a debug profile)
-- Comes with three games to build for your watch: **Dino, Flappy, Snake** (section 4.5)
+- Comes with three games to build for your watch: **Dino, Flappy, Snake** ([developer guide](docs/DEVELOPMENT.md#25-ready-made-games-dino-flappy-snake))
 - Uploads **MP3/M4A/AAC/FLAC/WAV/OPUS** to the watch's own music player (to listen without the phone)
 - **JSON messaging** between your watch apps and the phone (Wear Engine P2P)
 - Shows the watch's **UDID** (needed for the debug profile; no Android phone required)
@@ -85,22 +88,11 @@ HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 ## 2. Requirements
 
-| | What for | How |
-|---|---|---|
-| Mac + **Xcode 16+** | the iPhone app | App Store |
-| **XcodeGen** | generating the Xcode project | `brew install xcodegen` |
-| Apple ID | installing on your iPhone | A free account works (apps must be reinstalled every 7 days) |
-| **Huawei developer account** | signing watch apps | Free, [developer.huawei.com](https://developer.huawei.com) |
-| **OpenHarmony SDK (API 9)** | compiling watch apps | DevEco Studio 3.1 → Settings → SDK → OpenHarmony API 9 (`js` and `toolchains`). Default location: `~/Library/Huawei/Sdk/openharmony/9` |
-| **Node.js 16** | the watch app compiler (ace-loader) | the Node that DevEco installs, or `nvm install 16`. Newer versions don't work |
-| **Java 11+** | packing and signing tools | `brew install openjdk@17` |
-| Python 3 | helper tools | comes with macOS |
-
-If the SDK or Node live elsewhere, set `OHOS_SDK=/path` or `NODE16=/path/to/node`.
-
-> If you only want the iPhone app (pairing, music upload, notifications, watch faces) you don't need the Huawei
-> account or the OpenHarmony SDK; those are only for installing your own watch apps. You don't need a Mac either:
-> there is a prebuilt app (section 3).
+- An iPhone and an Apple ID (a free one works; the app then has to be reinstalled every 7 days).
+- **No Mac needed** with the prebuilt app (section 3). To build it yourself: a Mac with **Xcode 16+** and
+  **XcodeGen** (`brew install xcodegen`).
+- Pairing, watch faces, music and notifications need nothing else. Your own watch apps also need a Huawei developer
+  account and the OpenHarmony SDK: see the [developer guide](docs/DEVELOPMENT.md#1-requirements).
 
 ---
 
@@ -110,7 +102,7 @@ If the SDK or Node live elsewhere, set `OHOS_SDK=/path` or `NODE16=/path/to/node
 [Releases](https://github.com/burak4arslan/huawei-watch-sideload-ios/releases/latest) and install it with
 [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using your own Apple ID. Then on the iPhone:
 Settings → General → VPN & Device Management → trust your Apple ID, and turn on Developer Mode if iOS asks. With a
-free Apple ID the app has to be reinstalled every 7 days. If your own watch apps will message the phone (4.4), build
+free Apple ID the app has to be reinstalled every 7 days. If your own watch apps will message the phone ([developer guide](docs/DEVELOPMENT.md#24-talking-to-the-phone)), build
 the app yourself instead: the sideloading tool may change the bundle ID.
 To build an unsigned IPA with your own bundle ID without a Mac, fork the repository and run
 *Actions → Build unsigned IPA*.
@@ -136,7 +128,7 @@ watch faces, music for the watch's player), **Features** (the watch speaker and 
 3. **Pair**. If the watch asks for confirmation, accept it.
 4. From then on HuaSideload reconnects and pairs automatically.
 
-**UDID:** after pairing it appears on the **Watch** tab under Status, hidden. **Show identity** reveals it, **Copy UDID** copies it. You need it for the debug profile.
+**UDID:** after pairing it appears on the **Watch** tab under Status, hidden. **Show identity** reveals it, **Copy UDID** copies it. You need it for the debug profile ([developer guide](docs/DEVELOPMENT.md#21-huawei-developer-account-and-signing-once)).
 
 **Language:** the globe menu (top right) switches between English and Turkish. The first launch follows the phone's language.
 
@@ -165,112 +157,19 @@ Good to know:
   app's audio takes that route by itself.
 - Only an answered *incoming* call works. An outgoing call, or routing audio to the watch without a call, plays
   nothing on the watch (tested).
-- **For features:** `host.speaker` (`WatchSpeaker`) tells when the speaker is on and off (`onPlaying`, `onEnded`), can
-  ring the watch (`ring()`), and reports gestures with the watch's volume panel (`onVolumeGesture`): down a little and
-  right back up, that twice, or down to the bottom and up again. The watch never changes the volume on its own, so a
-  feature can use them to control its own player, e.g. through the Spotify Web API. (The mic button can't be used
-  reliably: in quiet parts of a song the watch mutes its mic on its own too.)
+- **For features:** the speaker events and volume gestures are in the
+  [developer guide](docs/DEVELOPMENT.md#26-the-watch-speaker-in-your-features).
 
 ---
 
-## 4. Your own watch app
+## 4. Watch apps and watch faces
 
-### 4.1 Huawei developer account and signing (once)
-
-The watch only installs apps signed with a Huawei-issued debug profile that **contains your watch's UDID**.
-
-**a) Create a key and a CSR** (with the signing tool from the OpenHarmony SDK):
-```bash
-SDK=~/Library/Huawei/Sdk/openharmony/9
-mkdir -p signing && cd signing
-java -jar $SDK/toolchains/lib/hap-sign-tool.jar generate-keypair \
-  -keyAlias mykey -keyAlg ECC -keySize NIST-P-256 \
-  -keystoreFile mykey.p12 -keyPwd YOURPASSWORD -keystorePwd YOURPASSWORD
-java -jar $SDK/toolchains/lib/hap-sign-tool.jar generate-csr \
-  -keyAlias mykey -keyPwd YOURPASSWORD -keystoreFile mykey.p12 -keystorePwd YOURPASSWORD \
-  -subject "C=US,O=Your Name,OU=Your Name,CN=mykey" -signAlg SHA256withECDSA -outFile mykey.csr
-echo -n YOURPASSWORD > password.txt
-```
-
-**b) In AppGallery Connect** ([developer.huawei.com](https://developer.huawei.com) → AppGallery Connect):
-1. **Certificates, App ID and Profiles → Certificates → New:** type **Debug**, upload `mykey.csr`, download the `.cer` → `signing/mykey-debug.cer`.
-2. **Devices → Add:** type **Sports watch** (lite wearable), paste the UDID from HuaSideload.
-3. **My projects → create a project → Add app:** HarmonyOS app, device **Sports watch**, package name (e.g. `com.yourname.huasideload.sample`). Don't select any capabilities or permissions.
-4. **Profiles → Add:** that app, type **Debug**, your certificate, your watch → download the `.p7b` → save it named after the app's package, e.g. `signing/profiles/com.yourname.huasideload.sample.p7b`.
-
-Repeat steps 3 and 4 for every new watch app. The key, certificate and device stay the same.
-
-**c) `signing/signing.env`:** copy `signing/signing.env.example` and fill in the file names. Nothing in `signing/` is committed to git.
-
-### 4.2 Start from the sample
-
-```bash
-cp -R watch-apps/sample watch-apps/my-app
-```
-- `entry/src/main/config.json` → set `bundleName` to your package name from AppGallery Connect.
-- `resources/base/element/string.json` → `app_name` (the name shown on the watch, at most 30 characters).
-- Icon: `python3 tools/make-app-icon.py watch-apps/my-app 2A6FDB` (a colored disc), or put your own `icon.png` (114×114) and `icon_small.png` (41×41) in `resources/base/media/`.
-
-### 4.3 Build, bundle into the iPhone app, install on the watch
-
-```bash
-tools/build-watch-app.sh watch-apps/my-app     # → WatchApps/My App.bin  (file name = app_name)
-./generate.sh                                  # adds the new .bin to the Xcode project
-```
-1. Run the iPhone app from Xcode again.
-2. **Install** tab → **Watch apps** → **"Install … on the watch"**.
-3. When it's done the app appears in the watch's app list. To remove it: **Show apps on the watch** → **Delete**.
-
-At the end `build-watch-app.sh` checks the package against the watch installer's rules with
-`tools/check-watch-bin.py`. If it says "WILL NOT INSTALL", the reason is printed right there.
-
-**Updating:** **increase** `version.code` in `config.json` (the watch refuses the same or a lower version), build, install again.
-
-### 4.4 Talking to the phone
-
-On the watch, `common/bridge.js`:
-```js
-import bridge from '../../common/bridge.js';
-bridge.listen(function (message) { /* from the phone: {"t": ..., ...} */ });
-bridge.start();
-bridge.send({ t: 'hello' }, function (ok) { /* delivered? */ });
-```
-
-On the iPhone, a `WatchFeature` (see `HuaSideload/HelloFeature.swift`):
-```swift
-final class MyFeature: WatchFeature {
-    private weak var host: WatchFeatureHost?
-    var watchPackages: [String] { ["com.yourname.huasideload.sample"] }
-    func attach(to host: WatchFeatureHost) { self.host = host }
-    func handle(_ message: [String: Any], from package: String) async -> Bool {
-        guard message["t"] as? String == "hello" else { return false }
-        host?.bridge(for: package)?.send(["t": "hello", "s": "Hi!"])
-        return true
-    }
-}
-```
-Add it in `WatchFeatures.load()`, or keep it in a separate project as described in section 6.
-A feature can also put its own sections on the **Features** tab (`sections()`).
-
-### 4.5 Ready-made games: Dino, Flappy, Snake
-
-`watch-apps/` has three games for 466×466 round screens, tested on a HUAWEI WATCH GT 3 SE. Signed builds can't be
-shared (a `.bin` is signed for one developer's watches), so build them with your own signing like any other app:
-
-| Game | Folder | What it is |
-|---|---|---|
-| **Dino** | `watch-apps/dino` | endless runner: tap to jump over cacti and birds, day and night mode |
-| **Flappy** | `watch-apps/flappy` | tap to fly through the pipes; after a new best score it sends `{"t": "flappy", "s": score, "b": best}` to the iPhone (a `bridge.js` example: handle it in your own `WatchFeature`, section 4.4) |
-| **Snake** | `watch-apps/snake` | Nokia-style snake on a round arena without walls; it turns toward your tap |
-
-For each game:
-1. AppGallery Connect: add an app with your own package name (e.g. `com.yourname.huasideload.dino`) and a debug profile for it (section 4.1, steps 3 and 4).
-2. Put that package name into the game's `entry/src/main/config.json` → `bundleName`.
-3. Build: `HUASIDELOAD_LEGACY_IMAGES=1 tools/build-watch-app.sh watch-apps/dino`, then `./generate.sh` and run the iPhone app again (section 4.3).
-
-`HUASIDELOAD_LEGACY_IMAGES=1` keeps only one copy of every image in the package (the compiler writes each image
-twice), which makes Dino about 40% smaller. The images are generated by `tools/make_sprites.py` / `tools/make_assets.py`
-inside each game folder.
+**4.1–4.5 Your own watch apps** are in the [developer guide](docs/DEVELOPMENT.md#2-your-own-watch-app):
+[signing](docs/DEVELOPMENT.md#21-huawei-developer-account-and-signing-once) ·
+[sample app](docs/DEVELOPMENT.md#22-start-from-the-sample) ·
+[build and install](docs/DEVELOPMENT.md#23-build-bundle-into-the-iphone-app-install-on-the-watch) ·
+[talking to the phone](docs/DEVELOPMENT.md#24-talking-to-the-phone) ·
+[games: Dino, Flappy, Snake](docs/DEVELOPMENT.md#25-ready-made-games-dino-flappy-snake)
 
 ### 4.6 Watch faces
 
@@ -295,74 +194,7 @@ Both are made for 466×466 round screens (tested on a GT 3 SE).
 
 ---
 
-## 5. Things to know when writing watch apps
-
-All of these were found by testing on the watch. Most of them give no error message at all: just "103",
-a black screen or a frozen watch.
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Install fails with **103** | no `icon_small.bin` in the icon folder | add `resources/base/media/icon_small.png` (41×41) |
-| Install fails with **103** | your watch's UDID is not in the profile / wrong package name / wrong certificate | check 4.1; `tools/check-watch-bin.py` inspects the package |
-| Install fails with **103** | `version.code` is not higher than the installed version | increase it |
-| **Black screen** at launch | `import x from '@system.wearengine'` (not known to the OpenHarmony compiler; webpack emits code that throws at runtime) | load it with `requireModule('@system.wearengine')` inside try/catch (`bridge.js` does this). The build tool stops on `COMPILE RESULT:FAIL` |
-| Watch **freezes** at launch | starting the phone connection on the very first page at launch | a plain splash page (`pages/index`) + `router.replace` to the real page, connect there |
-| Watch **freezes** at launch | `config.json` → `module.metaData` → `supportLists` | leave it out; messaging works without it |
-| Drawings pile up, memory fills | the lite `canvas` has no `clearRect` | recreate the canvas with `if` (swap between two canvases) |
-| `fillText` draws nothing | the canvas font needs a font family name | draw text with a normal `<text>` on top |
-| Messages don't arrive | messages larger than ~1 KB | split them (`WatchAppBridge.sendBatch` on the iPhone side) |
-
-**Other notes:**
-- Keep the screen on: `requireModule('@system.brightness').setKeepScreenOn({ keepScreenOn: true })`.
-- The lite JS engine (JerryScript) is small and slow; write short code with `var`, `function` and plain objects.
-- Each Bluetooth message takes about 0.3 s round trip. Pack multi-part data into few messages.
-
----
-
-## 6. Keeping your own features in a separate project
-
-This repo is the **core**. You can keep your own features and watch apps out of it, in a separate folder:
-
-```
-~/Projects/
-  HuaSideload/            ← this repo (core)
-  HuaSideload-private/    ← your private project (doesn't need to be on git at all)
-    project.yml           ← takes the core from ../HuaSideload/HuaSideload, adds your iOS/ and WatchApps/
-    iOS/                  ← your WatchFeatures
-    watch-apps/           ← your watch apps
-    signing/              ← your signing files
-    WatchApps/            ← built .bin files
-```
-
-In the private project, define a class implementing `WatchFeatureProvider` with the Objective-C name
-`HuaSideloadPrivateFeatures`. The core finds it at runtime:
-```swift
-@objc(HuaSideloadPrivateFeatures)
-final class PrivateFeatures: NSObject, WatchFeatureProvider {
-    @MainActor func makeFeatures() -> [WatchFeature] { [MyFeature()] }
-}
-```
-
-Sources in the private project's `project.yml`:
-```yaml
-sources:
-  - path: ../HuaSideload/HuaSideload
-    excludes: ["Info.plist"]
-  - path: iOS
-  - path: WatchApps
-    buildPhase: resources
-    includes: ["*.bin"]
-```
-Build its watch apps with this repo's tool:
-```bash
-HUASIDELOAD_SIGNING_DIR=$PWD/signing HUASIDELOAD_OUT_DIR=$PWD/WatchApps \
-HUASIDELOAD_PHONE_PACKAGE=com.yourname.huasideload ../HuaSideload/tools/build-watch-app.sh watch-apps/my-app
-```
-Fixes to the core then reach both projects automatically.
-
----
-
-## 7. Troubleshooting
+## 5. Troubleshooting
 
 - **The watch is not in the list:** if it's actively connected to another phone or to Huawei Health it may not show up. Close Health, toggle Bluetooth, **Find watch**.
 - **Pairing times out at "1/4 Link parameters" and the log is full of "could not decrypt" packets:** Huawei Health is connected to the watch on the same iPhone and syncing; those packets are its traffic, and the watch ignores HuaSideload until Health lets go. Close Health, turn it off in iOS **Settings → Privacy & Security → Bluetooth** for now, restart the watch, then **Forget pairing** → **Pair**. When you're done, **Disconnect (release for Huawei Health)** and turn Health's Bluetooth permission back on. No watch reset needed ([#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6)).
@@ -371,67 +203,16 @@ Fixes to the core then reach both projects automatically.
 - **Pairing stops at "HiChain JSON could not be decoded" or you want to report a pairing problem:** turn on pairing diagnostics (**Log** tab) and attach the log. It shows packet layouts only, no keys, PIN, UDID or MAC.
 - **Watch face install fails with 100004:** the watch wants its Huawei account ID first, see section 4.6.
 - **The watch face transfers but never shows up on the watch:** try another **Upload method** under Watch faces. Full HarmonyOS watches may want the whole package instead of watchface.bin. The app checks the watch's face list for up to 90 s and logs what it found.
-- **Install fails with 103:** see the table in section 5. Start with `python3 tools/check-watch-bin.py WatchApps/X.bin`.
-- **"Could not reach the phone (is HuaSideload open?)":** the iPhone app must be running and connected to the watch. It also works in the background, but not after you force-quit it.
 - **The watch loses the phone after a while:** check that HuaSideload wasn't swiped away (section 3, "In the background"). The log shows "iOS relaunched the app in the background for the watch" when iOS brought it back.
 - **Watch speaker: "not connected to the iPhone for calls":** in the iPhone's Bluetooth settings, tap the watch to connect it; calls must ring on the watch.
 - **Questions and bug reports:** [GitHub Issues](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues). Attach the log.
 - **Sharing the log:** **Copy** on the **Log** tab. Identity details stay masked unless **Show identity** is on.
-- **Live log on a Mac** (unlock the iPhone first; every line starts with `[HuaSideload]`):
-  ```bash
-  xcrun devicectl list devices    # shows your iPhone's identifier, e.g. 00008110-001A2B3C4D5E6F70
-  xcrun devicectl device process launch --device 00008110-001A2B3C4D5E6F70 --console com.yourname.huasideload
-  ```
-  `-e '{"HUASIDELOAD_DIAG":"1"}'` also asks the watch for its supported commands, capabilities and music storage.
+- **Your own watch apps** (install fails with 103, "Could not reach the phone", live log on a Mac): see the
+  [developer guide's troubleshooting](docs/DEVELOPMENT.md#5-troubleshooting-for-developers).
 
 ---
 
-## 8. Project layout and how it works
-
-```
-HuaSideload/               the iPhone app (SwiftUI)
-  HuaweiProtocol.swift     packet framing (0x5A, CRC16), VarInt, TLV, slicing
-  HuaweiAuth.swift         HiChain pairing, AES-GCM/CBC, product info, notifications
-  HuaweiFeatures.swift     services: music 0x25, file upload 0x28, apps 0x2A, P2P 0x34
-  HuaweiSession.swift      request/response, encryption, file upload state machine, P2P
-  WatchLink.swift          CoreBluetooth, pairing, install/remove, music upload, privacy, features
-  WatchAppCatalog.swift    finds the bundled .bin files, derives the messaging identity from the profile
-  WatchAppBridge.swift     JSON messaging with a watch app
-  WatchFeature.swift       plugin API
-  WatchFacePackage.swift   reads .hwt watch face packages (minimal zip reader)
-  WatchSpeaker.swift       iPhone audio on the watch speaker (CallKit incoming call + HFP), volume gestures
-  HelloFeature.swift       sample feature
-  Localization.swift       English / Turkish
-watch-apps/sample/         sample watch app (lite wearable JS)
-watch-apps/dino|flappy|snake/   ready-made games
-WatchFaces/                ready-made watch faces (.hwt), bundled into the iPhone app
-tools/
-  build-watch-app.sh       compile → pack → sign → check
-  check-watch-bin.py       will a .bin pass the watch installer?
-  make-app-icon.py         icon.png + icon_small.png
-  make-brand-icon.swift    draws the HuaSideload icon
-signing/                   (not in git) key, certificate, profiles
-WatchApps/                 (not in git) built watch apps
-```
-
-**The protocol in short:** the watch exposes BLE service `FE86` (write `FE01`, notify `FE02`). Packets start
-with `0x5A` and end with a CRC16/XMODEM; the payload is TLV. Pairing uses HiChain, after which everything is
-encrypted with AES-GCM.
-- **Installing:** the file is uploaded over `0x28` as type 6; the watch reports progress and the result with `0x2A/0x02` (102 installed, 103 failed).
-- **Music:** uploaded as type 2; the watch then asks for the song title with `0x25/0x09`.
-- **Watch faces:** only `watchface.bin` from inside the `.hwt` is uploaded, as type 1, with a name and version (like Gadgetbridge).
-- **Notifications:** sent as an app notification (type `0x7F`) with the app's ID (tag `0x11`); the watch shows its built-in icon for apps it knows. After pairing, the app also offers its own icon to the watch's notification icon service (`in.huawei.NotificationAppIcon` over P2P; the watch asks for the sizes it wants, file type 7). Tested on a GT 3 SE: it takes the icons but keeps showing the default icon. Gadgetbridge reports that uploaded notification icons need HarmonyOS 5 or later.
-- **Messaging with watch apps:** Wear Engine P2P (`0x34`). A watch app's identity is `package + "_" + base64(EC public key of the developer certificate)`; `WatchAppCatalog` derives it from the profile inside the `.bin`.
-- **UDID:** the watch sends its UDID on every pairing, in tag `0x05` of the security negotiation reply (`0x01/0x33`).
-- **Background:** `CBCentralManager` with a restore identifier (CoreBluetooth state restoration). If iOS terminates the app, it keeps the pending connection and relaunches the app for the watch's events; the app then sets up the channel and pairs again with the saved key.
-- **Watch speaker:** a CallKit *incoming* call (`reportNewIncomingCall`); after it is answered on the watch, `AVAudioSession` `.playAndRecord` with `.allowBluetooth` (HFP) and `.mixWithOthers`, playing silence to keep the route open. Needs `UIBackgroundModes` `voip` (without it CallKit refuses the call) and `audio`. The volume panel on the watch shows up as `outputVolume` changes on the iPhone.
-
-The build pipeline is the command-line equivalent of DevEco Studio's "legacy lite" build:
-ace-loader (webpack lite) → restool → haptobin_tool → hap-sign-tool `sign-app -inForm bin`.
-
----
-
-## 9. Credits and license
+## 6. Credits and license
 
 - The Huawei protocol was ported to Swift from the Huawei support in [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) (AGPL-3.0); therefore this project is licensed under **AGPL-3.0** as well (`LICENSE`).
 - The watch-side install rules were found by reading OpenHarmony's `appexecfwk_lite` and `security_appverify` sources (Apache-2.0).

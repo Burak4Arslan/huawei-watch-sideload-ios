@@ -52,6 +52,8 @@ final class HuaweiSession {
     private(set) var isPaired = false
     private(set) var watchUDID: String?
     private var sessionKey: [UInt8]?
+    private var liteCounter: UInt32?
+    private(set) var isLitePairing = false
     private var waiters: [Waiter] = []
     private var notificationId: UInt16 = 0
 
@@ -125,17 +127,21 @@ final class HuaweiSession {
         link = nil
         isPaired = false
         sessionKey = nil
+        liteCounter = nil
+        isLitePairing = false
         let pending = waiters
         waiters.removeAll()
         pending.forEach { $0.continuation.resume(throwing: HuaweiSessionError.disconnected) }
     }
 
     func hasAuthToken(for watch: String) -> Bool {
-        store.authToken(for: watch) != nil
+        store.authToken(for: watch) != nil || liteCredential("pin", watch: watch) != nil
     }
 
     func forget(watch: String) {
         store.setAuthToken(nil, for: watch)
+        CredentialStore.shared.set(nil, for: "lite.pin." + watch)
+        CredentialStore.shared.set(nil, for: "lite.secret." + watch)
         isPaired = false
         sessionKey = nil
     }
@@ -309,7 +315,13 @@ final class HuaweiSession {
     // HuaweiTLV.encryptRaw: encrypts raw bytes and wraps them in a 7C/7D/7E TLV
     private func encryptRaw(_ bytes: [UInt8]) throws -> [UInt8] {
         guard let key = sessionKey, let link else { throw HuaweiSessionError.notPaired }
-        let iv = HCrypto.random(16)
+        let iv: [UInt8]
+        if var counter = liteCounter {
+            iv = HiChainLite.nextIV(counter: &counter)
+            liteCounter = counter
+        } else {
+            iv = HCrypto.random(16)
+        }
         let cipher = link.usesGCM
             ? try HCrypto.gcmSeal(bytes, key: key, nonce: iv)
             : try HCrypto.cbcEncrypt(bytes, key: key, iv: iv)
@@ -322,6 +334,8 @@ final class HuaweiSession {
     func pair(watch: String) async throws {
         isPaired = false
         sessionKey = nil
+        liteCounter = nil
+        isLitePairing = false
         onPairingStage?(.negotiating)
 
         let linkResponse = try await request(LinkParams.serviceId, LinkParams.commandId,
@@ -354,6 +368,11 @@ final class HuaweiSession {
         }
         let authType = SecurityNegotiation.authType(negotiationTLV)
         log(.info, String(format: L("Pairing type requested by the watch: 0x%X", "Saatin istediği eşleşme türü: 0x%X"), authType))
+        if HiChainLite.supports(link, authType: authType) {
+            isLitePairing = true
+            try await pairLite(watch: watch, link: link)
+            return
+        }
         guard SecurityNegotiation.isHiChain(authType) else {
             throw HuaweiSessionError.unsupported(String(format: L("HiChain Lite (type 0x%X) is not implemented yet",
                                                                   "HiChain Lite (tür 0x%X) henüz yazılmadı"), authType))
@@ -388,6 +407,73 @@ final class HuaweiSession {
         onPairingStage?(.authenticated)
         log(.success, L("HiChain finished: the connection to the watch is encrypted. Finishing setup…",
                         "HiChain bitti: saatle bağlantı şifreli. Kurulum tamamlanıyor…"))
+    }
+
+    private func liteCredential(_ kind: String, watch: String) -> [UInt8]? {
+        // Unlike the legacy store, new Lite credentials must never fall back to UserDefaults.
+        CredentialStore.shared.secure.read("lite.\(kind)." + watch).flatMap { [UInt8](hex: $0) }
+    }
+
+    private func pairLite(watch: String, link: LinkInfo) async throws {
+        guard link.serverNonce.count == 16 else {
+            throw HuaweiAuthError.unexpected("HiChain Lite: missing 16-byte server nonce")
+        }
+        log(.info, "EXPERIMENTAL HiChain Lite Auth-1/CBC. Bonding may interrupt Huawei Health; no account setup will be sent.")
+        var pin = liteCredential("pin", watch: watch)
+        if pin == nil {
+            let response = try await request(0x01, HiChainLite.pinCommand, HuaweiTLV().with(0x01),
+                label: "Lite 1/4: request PIN; confirm on watch if asked", encrypted: false, timeout: 60)
+            guard let tlv = response.tlv else { throw HuaweiAuthError.unexpected("HiChain Lite: missing PIN reply") }
+            pin = try PinCode.decrypt(tlv, link: link)
+            onPairingStage?(.pinProcessed)
+        }
+        guard let pin, !pin.isEmpty else { throw HuaweiAuthError.unexpected("HiChain Lite: empty PIN") }
+        let auth = try HiChainLite.authentication(pin: pin, serverNonce: link.serverNonce,
+            clientNonce: HCrypto.random(16), authAlgo: link.authAlgo)
+        let response = try await request(0x01, HiChainLite.authCommand, auth.request,
+            label: "Lite 2/4: authenticate", encrypted: false, timeout: 60)
+        guard let actual = response.tlv?.value(0x01), HiChainLite.validates(actual, expected: auth.expectedResponse) else {
+            throw HuaweiAuthError.tokenMismatch("HiChain Lite: authentication response mismatch; no bonding key sent")
+        }
+
+        let identity = HiChainLite.identity(seed: store.deviceId)
+        let params = try await request(0x01, HiChainLite.bondParamsCommand,
+            HiChainLite.bondParameters(serial: identity.serial, mac: identity.mac),
+            label: "Lite 3/4: bonding parameters", encrypted: false)
+        guard let paramsTLV = params.tlv, let status = paramsTLV.int(0x01), [0, 1].contains(status),
+              let counterBytes = paramsTLV.value(0x09), counterBytes.count == 4,
+              let initialCounter = paramsTLV.int(0x09) else {
+            throw HuaweiAuthError.unexpected("HiChain Lite: invalid bonding status/counter; no bonding key sent")
+        }
+        var counter = UInt32(truncatingIfNeeded: initialCounter)
+        let iv = HiChainLite.nextIV(counter: &counter)
+        let secret = liteCredential("secret", watch: watch) ?? HCrypto.random(16)
+        guard secret.count == 16 else { throw HuaweiAuthError.unexpected("HiChain Lite: invalid saved key") }
+        // Persist before sending: a lost ACK must not lose a key the watch may have accepted.
+        let backend = CredentialStore.shared.secure
+        guard backend.write(pin.hexCompact, for: "lite.pin." + watch),
+              backend.write(secret.hexCompact, for: "lite.secret." + watch) else {
+            throw HuaweiAuthError.crypto("HiChain Lite: Keychain write failed; no bonding key sent")
+        }
+        let bond = try HiChainLite.bond(serial: identity.serial, secret: secret, wrappingKey: auth.wrappingKey, iv: iv)
+        sessionKey = secret
+        liteCounter = counter
+        do {
+            let reply = try await request(0x01, HiChainLite.bondCommand, bond,
+                label: "Lite 4/4: establish bonding key; confirm on watch if asked", encrypted: false, timeout: 60)
+            if let code = reply.tlv?.int(0x7F), code != HuaweiPacket.resultSuccess {
+                throw HuaweiAuthError.watchError(String(format: "HiChain Lite bond result 0x%X", code))
+            }
+            // A Bond ACK alone is insufficient: verify the new encrypted channel before reporting success.
+            _ = try await batteryLevel()
+            isPaired = true
+            onPairingStage?(.authenticated)
+            log(.success, "HiChain Lite: authentication, bonding and battery query completed")
+        } catch {
+            sessionKey = nil
+            liteCounter = nil
+            throw error
+        }
     }
 
     // GetHiChainRequest: op 1 returns the permanent key (authToken), op 2 the session key

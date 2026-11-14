@@ -328,7 +328,7 @@ final class WatchLink: NSObject, ObservableObject {
 
             // Off by default: on a GT 3 SE set up with Huawei Health, the account message made the watch ask for a
             // factory reset ("phone and watch accounts don't match"). Newer watches (Watch Fit 4 Pro) need it.
-            if UserDefaults.standard.bool(forKey: Self.pairingSetupKey) {
+            if !session.isLitePairing && UserDefaults.standard.bool(forKey: Self.pairingSetupKey) {
                 // Like Gadgetbridge: the watch waits for these after HiChain (PairingSetup)
                 self.pairingStage = .finishingSetup
                 let setup = await session.completeSetup(watchName: self.connectedName ?? "", accountId: Self.huaweiAccountId)
@@ -362,7 +362,7 @@ final class WatchLink: NSObject, ObservableObject {
             }
             self.features.forEach { $0.watchPaired() }
             try await self.refreshInfo(session)
-            Task { await self.offerNotificationIcon(session) }
+            if !session.isLitePairing { Task { await self.offerNotificationIcon(session) } }
         }
     }
 

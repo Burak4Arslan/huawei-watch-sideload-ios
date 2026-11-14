@@ -1,6 +1,7 @@
 import CommonCrypto
 import CryptoKit
 import Foundation
+import Security
 
 // Pairing (HiChain) and encryption.
 // Ported from Gadgetbridge: HuaweiCrypto.java, CryptoUtils.java, GetHiChainRequest.java,
@@ -129,12 +130,14 @@ struct LinkInfo {
     var authAlgo = 0
     var bondState = 0
     var encryptMethod = 0
+    var serverNonce: [UInt8] = []
 
     init(_ tlv: HuaweiTLV) {
         if let v = tlv.int(0x01) { protocolVersion = v }
         if let v = tlv.int(0x02) { sliceSize = v }
         if let v = tlv.int(0x03) { mtu = v }
         if let v = tlv.value(0x05), v.count >= 2 { authVersion = Int(v[1]) }
+        if let v = tlv.value(0x05), v.count >= 18 { serverNonce = Array(v[2..<18]) }
         if let v = tlv.int(0x07) { deviceSupportType = v }
         if let v = tlv.int(0x08) { authAlgo = v }
         if let v = tlv.int(0x09) { bondState = v }

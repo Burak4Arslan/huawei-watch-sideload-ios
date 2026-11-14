@@ -12,7 +12,8 @@ let package = Package(
             path: "HuaSideload",
             exclude: ["Assets.xcassets"],
             sources: ["HiChainJSON.swift", "HuaweiProtocol.swift", "Localization.swift", "PairingSetup.swift",
-                      "WatchFaceSupport.swift", "WatchFacePackage.swift", "CredentialStore.swift", "HWTAnalyzer.swift"]
+                      "WatchFaceSupport.swift", "WatchFacePackage.swift", "CredentialStore.swift", "HWTAnalyzer.swift",
+                      "HuaweiAuth.swift", "HiChainLite.swift"]
         ),
         .testTarget(
             name: "HuaSideloadParsingTests",

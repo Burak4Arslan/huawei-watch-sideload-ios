@@ -65,14 +65,17 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 - Upload DRM-protected songs (Spotify, Apple Music) to the watch
 - Give watch apps internet access (but the phone app can send them any data)
 
-**Tested watch:** HUAWEI WATCH GT 3 SE (firmware 3.0.0.69, OpenHarmony 1.1 based lite wearable, API 6,
-466×466 round screen). **Reported working by users:** HUAWEI WATCH GT 3 (custom watch face, iOS 26.6.1,
-[#5](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/5)); HUAWEI Band 11 (custom watch face on two
-bands, firmware 6.0.0.130, needs the account setup from section 4.6,
-[#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)); HUAWEI WATCH GT 4 (custom watch face,
-firmware 5.0.0.88, needs the account setup from section 4.6,
-[#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6)). Other Huawei *lite wearable* watches on
-the same platform (GT 2 Pro, …) will likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
+**Tested watches:**
+
+| Watch | Firmware | What works | Note | Source |
+|---|---|---|---|---|
+| HUAWEI WATCH GT 3 SE | 3.0.0.69 | Everything in this README | 466×466 round, OpenHarmony 1.1 lite wearable, API 6 | Tested by me |
+| HUAWEI WATCH GT 3 | – | Custom watch face | iOS 26.6.1 | [#5](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/5) |
+| HUAWEI WATCH GT 4 | 5.0.0.88 | Custom watch face | Needs the account setup (4.6) | [#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6) |
+| HUAWEI Band 11 | 6.0.0.130 | Custom watch face (two bands) | Needs the account setup (4.6) | [#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4) |
+
+Other Huawei *lite wearable* watches on the same platform (GT 2 Pro, …) will likely work but are untested.
+HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 > ⚠️ **Disclaimer:** This uses an unofficial protocol. Pairing with HuaSideload may break the Huawei Health
 > connection; if something goes wrong you may need to reset the watch and pair it with Health again.

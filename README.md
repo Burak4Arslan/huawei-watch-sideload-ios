@@ -69,7 +69,9 @@ implementation. The app UI is available in **English and Turkish** (globe menu, 
 466×466 round screen). **Reported working by users:** HUAWEI WATCH GT 3 (custom watch face, iOS 26.6.1,
 [#5](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/5)); HUAWEI Band 11 (custom watch face on two
 bands, firmware 6.0.0.130, needs the account setup from section 4.6,
-[#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)). Other Huawei *lite wearable* watches on
+[#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)); HUAWEI WATCH GT 4 (custom watch face,
+firmware 5.0.0.88, needs the account setup from section 4.6,
+[#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6)). Other Huawei *lite wearable* watches on
 the same platform (GT 2 Pro, …) will likely work but are untested. HarmonyOS *wearable* watches (Watch 3/4) are a different platform.
 
 > ⚠️ **Disclaimer:** This uses an unofficial protocol. Pairing with HuaSideload may break the Huawei Health
@@ -273,10 +275,11 @@ Watch faces don't need a debug profile. Every `.hwt` in `WatchFaces/` is bundled
 on the **Install** tab under **Watch faces** with an install button; **Install a watch face (.hwt)** uploads any other `.hwt` file.
 After the upload, touch and hold the watch face on the watch and pick the new one.
 
-**Newer watches and bands (e.g. Band 11) reject the upload with error 100004** until the phone tells them the Huawei
+**Newer watches and bands (e.g. Band 11, GT 4) reject the upload with error 100004** until the phone tells them the Huawei
 account they belong to: turn on **Send setup after pairing** on the **Watch** tab, enter the Huawei account ID the
 watch was set up with, then **Forget pairing** → **Pair** and install again
-([#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4)). Double-check the ID first: with a wrong
+([#4](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/4),
+[#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6)). Double-check the ID first: with a wrong
 one the watch says the accounts don't match and may reset itself, so you'd have to set it up with Huawei Health again.
 The face stays on the watch after you switch back to Huawei Health.
 
@@ -359,6 +362,7 @@ Fixes to the core then reach both projects automatically.
 ## 7. Troubleshooting
 
 - **The watch is not in the list:** if it's actively connected to another phone or to Huawei Health it may not show up. Close Health, toggle Bluetooth, **Find watch**.
+- **Pairing times out at "1/4 Link parameters" and the log is full of "could not decrypt" packets:** Huawei Health is connected to the watch on the same iPhone and syncing; those packets are its traffic, and the watch ignores HuaSideload until Health lets go. Close Health, turn it off in iOS **Settings → Privacy & Security → Bluetooth** for now, restart the watch, then **Forget pairing** → **Pair**. When you're done, **Disconnect (release for Huawei Health)** and turn Health's Bluetooth permission back on. No watch reset needed ([#6](https://github.com/burak4arslan/huawei-watch-sideload-ios/issues/6)).
 - **"Verification failed: the saved key is no longer valid":** the watch was reset. **Forget pairing** → **Pair** again.
 - **Newer watches (Watch Fit 4 Pro, GT 6, GT 7…): "Pairing failed" right after pairing:** these watches wait for setup messages after pairing. Turn on **Send setup after pairing (newer watches)** on the **Watch** tab and pair again; if the watch was set up with Huawei Health, enter that Huawei account ID first. ⚠️ Double-check the ID: with an empty or wrong account ID the watch says "phone and watch accounts don't match" and may reset itself. Then set it up with Huawei Health again and pair once more with the right ID.
 - **Pairing stops at "HiChain JSON could not be decoded" or you want to report a pairing problem:** turn on pairing diagnostics (**Log** tab) and attach the log. It shows packet layouts only, no keys, PIN, UDID or MAC.

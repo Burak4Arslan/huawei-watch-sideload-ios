@@ -246,7 +246,8 @@ enum P2P {
         static let ack: UInt8 = 3
     }
 
-    // Acknowledgement codes (Wear Engine): 0xCF = received, 0xCD = ping reply (app present), 0xCE = app not running
+    // Acknowledgement codes (Wear Engine): 0xCF = received, 0xCD = ping reply (app present),
+    // 0xCE (206) = general communication failure (app closed or peer identity mismatch, per Huawei's FAQ)
     enum Code {
         static let ok = 0xCF
         static let pingReply = 0xCD
